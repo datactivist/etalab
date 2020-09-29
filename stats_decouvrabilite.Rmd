@@ -1,0 +1,276 @@
+---
+title: "Travail sur les statistiques liées à la découvrabilité des jeux de données"
+author: "Samuel Goëta"
+date: "9/23/2020"
+output: html_document
+---
+### Librairies utilisées 
+
+```{r}
+library(tidyverse)
+library(skimr)
+library(treemapify)
+library(questionR)
+library(gouvdown)
+```
+
+
+
+### Import des données 
+
+J'importe d'abord la liste des jeux de données publiés sur data.gouv.fr :
+```{r}
+catalogue <- read_csv2("https://www.data.gouv.fr/fr/datasets/r/f868cca6-8da1-4369-a78d-47463f19a9a3")
+skim(catalogue)
+```
+
+## Nombre de jeux de données par producteurs
+
+### Intégralité des producteurs
+```{r}
+nbdatasetparorga <- catalogue %>% 
+  group_by(organization) %>% 
+  summarise(count = n()) %>% 
+  arrange(desc(count))
+
+
+
+ggplot(nbdatasetparorga, aes(area=count, label=organization, fill=count)) + 
+  geom_treemap() + 
+  geom_treemap_text(colour = "white", reflow = T)
+
+
+```
+
+### Top 100 des producteurs
+
+```{r}
+nbdatasetparorga_top50 <- nbdatasetparorga %>% 
+  head(50)
+
+ggplot(nbdatasetparorga_top50, aes(area=count, label=organization, fill=count)) + 
+  geom_treemap() + 
+  geom_treemap_text(colour = "white", reflow = T) + 
+labs(title = "Top 50 des producteurs sur data.gouv.fr", subtitle = "Nombre de jeux de données publiés par les 50 premiers producteurs", caption = "Source : catalogue data.gouv.fr, 24/09/20")
+
+```
+
+
+## Nombre de jeux de données par type d'organisation
+
+Ajout au catalogue du type d'organisation depuis Wikidata : 
+```{r}
+orgawiki <- 
+  read_csv("https://www.data.gouv.fr/fr/datasets/r/b8ed0dad-e7c9-4332-9ee8-e74ceaa7b247") %>% 
+  mutate(organization_id = datagouvid)
+
+# jointure du type d'orga depuis Wikidata
+
+catalogue_orga <- catalogue %>% 
+  left_join(orgawiki, by = "organization_id")
+
+
+# garder uniquement la première valeur du type d'organisation (exemple du ministère de la culture : ministère en France plutôt que ministère de la culture)
+
+orgawiki_clean <- orgawiki %>% 
+  group_by(datagouvid) %>% 
+  slice(1)
+
+catalogue_orga_clean <- catalogue %>% 
+  left_join(orgawiki_clean, by = "organization_id")
+
+```
+
+
+Nombre de jeux de données par type d'orga
+```{r}
+nbdatasetpartypeorga_clean <- catalogue_orga_clean %>% 
+  group_by(natureLabel) %>% 
+  filter(!is.na(natureLabel)) %>% 
+  summarise(count = n()) %>% 
+  arrange(desc(count)) %>% 
+  write_csv("nbdatasetpartypeorga_clean.csv")
+
+
+nbdatasetpartypeorga_mano <- 
+  read_csv("nbdatasetpartypeorga_clean.csv") %>% 
+  group_by(mano) %>% 
+  summarise(compte = sum(count))
+
+ggplot(nbdatasetpartypeorga_mano, aes(area=compte, label=mano, fill=compte)) + 
+  geom_treemap() + 
+  geom_treemap_text(colour = "white", reflow = T) + 
+labs(title = "Nombre de jeux de données publiés par type d'organisation", subtitle = "Nombre de jeux de données publiés par les 50 premiers producteurs", caption = "Source : catalogue data.gouv.fr, 24/09/20")
+```
+
+```{r}
+## Recoding catalogue_orga_clean$natureLabel into catalogue_orga_clean$natureLabel_rec
+catalogue_orga_clean$natureLabel_rec <- fct_recode(catalogue_orga_clean$natureLabel,
+  "collectivités locales" = "administration municipale en France",
+  "collectivités locales" = "établissement public de coopération intercommunale à fiscalité propre",
+  "collectivités locales" = "conseil régional en France",
+  "administrations centrales" = "ministère de l'Intérieur",
+  "administrations centrales" = "agence publique",
+  "collectivités locales" = "collectivité territoriale",
+  "collectivités locales" = "conseil départemental",
+  "autres" = "interface de programmation",
+  "entreprises" = "entreprise ferroviaire",
+  "collectivités locales" = "ville",
+  "administrations centrales" = "établissement public",
+  "collectivités locales" = "commune",
+  "autres" = "groupement d'intérêt économique",
+  "administrations centrales" = "ministère de l'Économie",
+  "collectivités locales" = "région française",
+  "collectivités locales" = "pôle métropolitain",
+  "administrations centrales" = "ministère de l'Éducation",
+  "collectivités locales" = "société d'économie mixte",
+  "collectivités locales" = "établissement public territorial",
+  "autres" = "organisation",
+  "administrations centrales" = "direction régionale de l'environnement, de l'aménagement et du logement",
+  "autres" = "association professionnelle",
+  "administrations centrales" = "cour des comptes",
+  "autres" = "chapitre local d'OpenStreetMap",
+  "administrations centrales" = "ministère en France",
+  "collectivités locales" = "intercommunalité",
+  "entreprises" = "banque",
+  "autres" = "pouvoir législatif",
+  "entreprises" = "firme",
+  "autres" = "Q1520859",
+  "autres" = "organisme sans but lucratif",
+  "autres" = "plateforme informatique",
+  "collectivités locales" = "département",
+  "administrations centrales" = "administration publique française",
+  "administrations centrales" = "banque de développement",
+  "administrations centrales" = "agence française de sécurité sanitaire",
+  "administrations centrales" = "établissement public à caractère administratif",
+  "administrations centrales" = "parc national de France",
+  "entreprises" = "fournisseur d'énergie",
+  "administrations centrales" = "administration publique centrale française",
+  "administrations centrales" = "administration publique",
+  "administrations centrales" = "autorité administrative indépendante",
+  "administrations centrales" = "ministère de la Santé",
+  "autres" = "Q2516436",
+  "autres" = "capitale",
+  "autres" = "parc naturel régional",
+  "administrations centrales" = "direction ministérielle",
+  "entreprises" = "société anonyme",
+  "collectivités locales" = "Autorité organisatrice de transport urbain",
+  "administrations centrales" = "institut officiel de statistique",
+  "collectivités locales" = "Association agréée de surveillance de la qualité de l'air",
+  "autres" = "entreprise de transport",
+  "administrations déconcentrées" = "direction départementale des territoires",
+  "autres" = "syndicat mixte",
+  "administrations centrales" = "ministère de l'Agriculture",
+  "collectivités locales" = "agence technique départementale",
+  "administrations centrales" = "bibliothèque nationale",
+  "administrations centrales" = "direction d'administration centrale",
+  "autres" = "institut de recherche",
+  "autres" = "aéroport",
+  "autres" = "service à compétence nationale",
+  "administrations centrales" = "ministère du logement",
+  "administrations centrales" = "établissement public à caractère industriel et commercial",
+  "collectivités locales" = "commune de la Polynésie française",
+  "autres" = "pôle de compétitivité",
+  "entreprises" = "agence de presse",
+  "administrations centrales" = "Établissement public à caractère scientifique et technologique",
+  "autres" = "Office agricole",
+  "autres" = "groupement d'intérêt public",
+  "administrations déconcentrées" = "service départemental d'incendie et de secours",
+  "autres" = "office des brevets",
+  "autres" = "fonction",
+  "autres" = "cinémathèque",
+  "autres" = "commission",
+  "autres" = "compagnie d'autocars intercités",
+  "autres" = "école",
+  "entreprises" = "entreprise sociale",
+  "autres" = "système de transport utilisant l’autobus",
+  "autres" = "association loi de 1901",
+  "autres" = "université en France",
+  "autres" = "Organisme d'habitations à loyer modéré",
+  "autres" = "archives communales",
+  "administrations centrales" = "ministère de la Jeunesse",
+  "autres" = "entreprise de transport par autocar",
+  "autres" = "chambre d'agriculture",
+  "autres" = "marque",
+  "entreprises" = "entreprise d'État",
+  "administrations déconcentrées" = "direction interrégionale de la mer",
+  "administrations déconcentrées" = "agence régionale de santé",
+  "entreprises" = "société",
+  "administrations déconcentrées" = "direction départementale des finances publiques",
+  "autres" = "œuvre",
+  "administrations centrales" = "fédération sportive",
+  "administrations centrales" = "ministère de l'Industrie",
+  "autres" = "musée d'art",
+  "autres" = "musée",
+  "autres" = "parti politique",
+  "administrations centrales" = "autorité publique indépendante",
+  "autres" = "station de recharge",
+  "autres" = "city aux États-Unis",
+  "autres" = "logiciel libre",
+  "administrations déconcentrées" = "service déconcentré de l'État",
+  "administrations déconcentrées" = "direction régionale de l'alimentation, de l'agriculture et de la forêt",
+  "autres" = "agence d’emploi",
+  "administrations déconcentrées" = "préfecture de région",
+  "autres" = "site web",
+  "administrations centrales" = "ministère de la Justice",
+  "autres" = "journal",
+  "administrations centrales" = "ministère de la Défense",
+  "autres" = "salle des fêtes",
+  "administrations déconcentrées" = "direction régionale",
+  "autres" = "pays",
+  "administrations déconcentrés" = "Secrétaire général aux affaires régionales",
+  "autres" = "grande école",
+  "autres" = "rectorat d'académie",
+  "collectivités locales" = "centre de gestion de la fonction publique territoriale",
+  "autres" = "cour constitutionnelle",
+  "entreprises" = "corporation",
+  "autres" = "société nationale du Mouvement international de la Croix-Rouge et du Croissant-Rouge",
+  "autres" = "chapitre Wikimedia",
+  "autres" = "base de données",
+  "autres" = "organisation internationale",
+  "autres" = "think tank",
+  "autres" = "organisation pour la protection de la nature",
+  "entreprises" = "fournisseur d'accès à internet",
+  "autres" = "syndicat professionnel",
+  "autres" = "Groupement d'intérêt scientifique",
+  "autres" = "organisation de santé",
+  "autres" = "chambre de métiers et de l'artisanat",
+  "autres" = "agence nationale",
+  "collectivités locales" = "conseil général",
+  "autres" = "institution de l'Union européenne",
+  "autres" = "institut",
+  "autres" = "office de tourisme",
+  "autres" = "université",
+  "autres" = "école de cinéma",
+  "autres" = "théâtre",
+  "autres" = "école d'art",
+  "autres" = "organisation non gouvernementale internationale",
+  "autres" = "Comité départemental du tourisme",
+  "autres" = "musée scientifique",
+  "autres" = "école de journalisme",
+  "autres" = "agence d'urbanisme",
+  "autres" = "gestionnaire d'infrastructure ferroviaire",
+  "autres" = "Agence de l'eau en France"
+)
+catalogue_orga_clean$natureLabel_rec <- fct_explicit_na(catalogue_orga_clean$natureLabel_rec, "autres")
+
+nbdatasetpartypeorga_clean_recode <- catalogue_orga_clean %>% 
+  group_by(natureLabel_rec) %>% 
+  filter(!is.na(natureLabel_rec)) %>% 
+  summarise(count = n()) %>% 
+  arrange(desc(count)) %>% 
+  write_csv("nbdatasetpartypeorga_clean.csv")
+
+
+nbdatasetpartypeorga_recode <- 
+  read_csv("nbdatasetpartypeorga_clean.csv") %>% 
+  group_by(natureLabel_rec) %>% 
+  summarise(compte = sum(count))
+
+ggplot(nbdatasetpartypeorga_recode, aes(area=compte, label=natureLabel_rec, fill=compte)) + 
+  geom_treemap() + 
+  geom_treemap_text(colour = "white", reflow = T) + 
+labs(title = "Nombre de jeux de données publiés par type d'organisation", caption = "Source : catalogue data.gouv.fr, Wikidata, recodage manuel, 24/09/20")
+```
+
+

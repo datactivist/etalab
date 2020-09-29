@@ -1,0 +1,160 @@
+---
+title: "Nettoyage des données de l'enquête usagers"
+author: "Samuel Goëta"
+date: "25/09/2020"
+output: html_document
+---
+```{r}
+library(tidyverse)
+library(skimr)
+
+enquete_usagers <- read_csv("data/Usagers-Grid view.csv") 
+
+names(enquete_usagers)
+
+enquete_public <- enquete_usagers %>% 
+  filter(enquete_usagers[69] == "J'accepte que mes réponses soient diffusées" ) %>%
+  write_csv("enquete_usagers_consentementok.csv")
+
+
+```
+
+
+```{r}
+## pivoter les profils
+
+enquete_usagers <- enquete_usagers %>%
+  pivot_longer(cols = c("agent-e de la fonction publique", "salarié-e du privé","chercheur ou chercheuse", "enseignant-e","statisticien-ne, data scientist, data analyst","développeuse / développeur informatique","journaliste","militant-e","étudiant-e", "autre"), names_to="profils") 
+
+enquete_usagers2 <- enquete_usagers %>% 
+  filter(!is.na(value)) %>% 
+  group_by(SID) %>% 
+  slice(1)
+  
+enquete_usagers2 %>% 
+  group_by(profils) %>% 
+  summarise(compte = n()) %>% 
+  ggplot(aes(area=compte, label=profils, fill=compte)) + 
+    geom_treemap() +
+    geom_treemap_text(colour = "white", reflow = T)
+
+
+```
+
+```{r}
+
+## Recoding enquete_usagers2$`Si vous avez coché "autre", à quel(s) site(s) pensez vous ?` into enquete_usagers2$`Si vous avez coché "autre", à quel(s) site(s) pensez vous ?_rec`
+enquete_usagers2$`Si vous avez coché "autre", à quel(s) site(s) pensez vous ?_rec` <- fct_recode(enquete_usagers2$`Si vous avez coché "autre", à quel(s) site(s) pensez vous ?`,
+  "geo.data.gouv.fr" = "https://geo.data.gouv.fr/fr/",
+  "geo.data.gouv.fr" = "geo.data.gouv",
+  "schema.data.gouv.fr" = "schema.data.gouv.fr, prix-carburants.gouv.fr",
+  "insee.fr" = "dbnomics, insee.fr",
+  "insee.fr" = "insee",
+  "donneespubliques.meteofrance.fr/" = "https://donneespubliques.meteofrance.fr/",
+  "insee.fr" = "https://www.interieur.gouv.fr/avotreservice/elections/telechargements/       insee.fr",
+  "geo.data.gouv.fr" = "Geo.data.gouv.fr",
+  "insee.fr" = "Insee, banque mondial",
+  "geoportail.gouv.fr" = "georisque.fr, geoportail.fr",
+  "osm" = "OSM via geofabrik",
+  "autres" = "BD Sandre, BD Carto, BD Hydro",
+  "autres" = "scheme documentation studio",
+  "schema.data.gouv.fr" = "geo.data.gouv.fr, cada.data.gouv.fr, schema.data.gouv.fr",
+  "insee.fr" = "insee, etc",
+  "portails locaux" = "https://data.toulouse-metropole.fr ; https://data.haute-garonne.fr",
+  "datatourisme" = "DATATourisme mais il n'est vraiment pas pratique ! Il faut impérativement ne pas suivre cet exemple !",
+  "autres" = "YOUTUBE; TWITCH",
+  "autres" = "sites opendata des ministères, des agences de l'état, géoportail, INSEE, etc.",
+  "portails locaux" = "Open Data des collectivités locales, photographies aériennes  Toulouse Métropole ( https://data.toulouse-metropole.fr/ )",
+  "autres" = "1 million d'autres sites correspondants à la question",
+  "data.gov" = "https://www.data.gov/",
+  "autres" = "inspire",
+  "autres" = "place des entreprises ; fce",
+  "portails locaux" = "site de collectivités locales",
+  "portails locaux" = "les sites des collectivités locales",
+  "data.caf.fr/" = "caf data, ursaaf data",
+  "insee.fr" = "insee & impot&etalab.gouv",
+  "autres" = "Tout un tas de sites à travers le monde",
+  "osm" = "openstreetmap.org",
+  "marches-publics.gouv.fr" = "https://www.marches-publics.gouv.fr/",
+  "autres" = "impots.gouv",
+  "autres" = "DOUANE.FOUV.FR   EUROPA",
+  "autres" = "ameli:open CCAM, Open LPP",
+  "insee.fr" = "insee, géoportail, drees, dares, dep...",
+  "data.ademe.fr" = "ADEME",
+  "geoportail.gouv.fr" = "geoportail, insee",
+  "autres" = "data infogreffe",
+  "portails locaux" = "datasud.fr, opendata MEL",
+  "data.ademe.fr" = "ademe",
+  "autres" = "Justice",
+  "autres" = "Kompass",
+  "portails locaux" = "parisdata lyondata",
+  "autres" = "Google",
+  "insee.fr" = "Insee",
+  "autres" = "le réseau internet",
+  "autres" = "geo, api",
+  "insee.fr" = "INSEE, SOES, datafoncier, IGN ..",
+  "autres" = "data.culture.gouv.fr, data.economie.gouv.fr",
+  "osm" = "IGN, OSM",
+  "autres" = "lecompteasso",
+  "insee.fr" = "insee / Observatoire des territoires / Statistiques locales / open Data DRESS / DARES",
+  "autres" = "les sites des dreal, atlas des patrimoines, géofabrik, les sites américains/canadiens de géographie naturelle,...",
+  "autres" = "météo jeux",
+  "osm" = "openstreetmap",
+  "autres" = "Smartech.com",
+  "insee.fr" = "insee, cerema, observatoire des territoires, open data locaux, dreal",
+  "insee.fr" = "INSEE, université Hopkins...",
+  "autres" = "Impôt.gouv.fr",
+  "insee.fr" = "INSEE, DVF, INFOCADA....",
+  "portails locaux" = "https://data.grandlyon.com",
+  "opendatasoft" = "Explore ODS, Insee, collectivites-locales.gouv.fr...",
+  "autres" = "Mail laposte",
+  "autres" = "Etalab",
+  "api.gouv.fr" = "api.gouv",
+  "geoportail.gouv.fr" = "geoportail, cerema",
+  "autres" = "aucun",
+  "autres" = "banque de france, eurostat",
+  "autres" = "etalab.gouv.fr",
+  "geoportail.gouv.fr" = "Geoportail.gouv.fr",
+  "autres" = "Très bien",
+  "autres" = "les registres des chambres de commerce",
+  "autres" = "Cartes IGN",
+  "portails locaux" = "Bordeaux métropole",
+  "autres" = "legifrance",
+  "portails locaux" = "les sites mis en place par les collectivités locales",
+  "geoportail de l'urbanisme" = "GPU Urbanisme",
+  "insee.fr" = "ensemble des sites INSEE, Observatoire des territoires - BIGDATA en général",
+  "autres" = "https://www.gis-fruits.org/Publication-du-GIS/Documents-du-GIS",
+  "autres" = "radars.securite-routiere.gouv.fr",
+  "autres" = "ministère de la santé et des soludarités.gouv.fr",
+  "autres" = "L'extension gouv.fr",
+  "autres" = "impôtgouv.fr",
+  "autres" = "ROME",
+  "autres" = "Impôt gouvernement.",
+  "geoportail.gouv.fr" = "https://www.geoportail.gouv.fr, agreste, eurostat, etc sites des logiciels",
+  "insee.fr" = "insee ; wipo ; Eurostats ; ECB ; WHO ; OECD",
+  "autres" = "sites de données de la recherche (dat@OSU, datacite, ...)",
+  "autres" = "gouvernement.fr/info-coronavirus",
+  "autres" = "impots",
+  "georisque" = "georisque, infoterre",
+  "autres" = "le recensement des équipements sportifs",
+  "datatourisme" = "data tourisme , geozone",
+  "autres" = "Insee, World Bank Open Data, Eurostat",
+  "autres" = "http://www.batiment-energiecarbone.fr/ => données non exploitable !",
+  "geo.data.gouv.fr" = "http://geo.data.gouv.fr/",
+  "autres" = "bnf",
+  "autres" = "https://api.gouv.fr/",
+  "autres" = "Never",
+  "autres" = "Des recherches sur Firefox ou Google ....",
+  "autres" = "ministère des comptes publics budgets des collectivités territoriales",
+  "autres" = "Santé Publique France",
+  "geo.data.gouv.fr" = "geodata.gouv",
+  "autres" = "compte associations",
+  "autres" = "Légifrance, registre des états civils, journal officiel, fancy-annu.",
+  "autres" = "santé public",
+  "geo.data.gouv.fr" = "geo.data.gouv.fr, api.gouv.fr, beta.gouv.fr, schema.gouv.fr",
+  "datafrance.info" = "datafrance : (ne manque plus qu'un dark mode",
+  "autres" = "INSEE"
+)
+enquete_usagers2$`Si vous avez coché "autre", à quel(s) site(s) pensez vous ?_rec` <- fct_explicit_na(enquete_usagers2$`Si vous avez coché "autre", à quel(s) site(s) pensez vous ?_rec`, "autres")head(enquete_usagers2)
+```
+
