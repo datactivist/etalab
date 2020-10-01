@@ -24,12 +24,11 @@ enquete_public <- enquete_usagers %>%
 ## pivoter les profils
 
 enquete_usagers <- enquete_usagers %>%
-  pivot_longer(cols = c("agent-e de la fonction publique", "salarié-e du privé","chercheur ou chercheuse", "enseignant-e","statisticien-ne, data scientist, data analyst","développeuse / développeur informatique","journaliste","militant-e","étudiant-e", "autre"), names_to="profils") 
+  pivot_longer(cols = agent-e, names_to="profils") 
 
 enquete_usagers2 <- enquete_usagers %>% 
   filter(!is.na(value)) %>% 
-  group_by(SID) %>% 
-  slice(1)
+  group_by(SID) 
   
 enquete_usagers2 %>% 
   group_by(profils) %>% 

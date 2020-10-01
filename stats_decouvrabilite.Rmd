@@ -21,7 +21,7 @@ library(gouvdown)
 J'importe d'abord la liste des jeux de données publiés sur data.gouv.fr :
 ```{r}
 catalogue <- read_csv2("https://www.data.gouv.fr/fr/datasets/r/f868cca6-8da1-4369-a78d-47463f19a9a3")
-skim(catalogue)
+head(catalogue)
 ```
 
 ## Nombre de jeux de données par producteurs
@@ -31,13 +31,13 @@ skim(catalogue)
 nbdatasetparorga <- catalogue %>% 
   group_by(organization) %>% 
   summarise(count = n()) %>% 
-  arrange(desc(count))
+  arrange(desc(count)) %>% 
+  drop_na(organization)
 
 
-
-ggplot(nbdatasetparorga, aes(area=count, label=organization, fill=count)) + 
-  geom_treemap() + 
-  geom_treemap_text(colour = "white", reflow = T)
+nbdatasetparorga %>% 
+  ggplot(aes(y = count)) +
+  geom_histogram()
 
 
 ```

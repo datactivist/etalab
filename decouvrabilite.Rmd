@@ -1,0 +1,153 @@
+---
+title: "Atelier sur la découvrabilité et la documentation des données"
+subtitle: "Enseignements des statistiques et l'enquête usagers"
+author: "Samuel Goëta, Datactivist"
+date: "Etalab, `r Sys.Date()`"
+output:
+  SlidesDatactivist::moon_reader:
+    css: [default, datactivist, datactivist-fonts]
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+      beforeInit: ["macros.js", "matomo.js", "https://platform.twitter.com/widgets.js"]
+      slideNumberFormat: |
+        <div class="progress-bar-container">
+          <div class="progress-bar" style="width: calc(%current% / %total% * 100%);">
+          </div>
+        </div>
+params:
+  event: Atelier découvrabilité et documentation
+  slug: etalab
+  description: Atelier sur la découvrabilité des données
+  title: Atelier sur la découvrabilité des données
+  image: https://github.com/datactivist/slides_datactivist/raw/master/inst/rmarkdown/templates/xaringan/resources/img/logo.png
+  image_alt: le logo de Datactivist
+---
+
+```{r, echo=FALSE}
+library(metathis)
+meta() %>% 
+  meta_description(params$event) %>% 
+  meta_name("github-repo" = paste0("datactivist/", params$slug)) %>% 
+  meta_viewport() %>% 
+  meta_social(
+    title = params$title,
+    url = paste0("https://datactivist.coop/", params$slug),
+    image = params$image,
+    image_alt = params$image_alt,
+    og_type = "website",
+    og_author = "Datactivist",
+    og_locale = "fr_FR",
+    og_site_name = "Datactivist",
+    twitter_card_type = "summary",
+    twitter_creator = "@datactivi_st")
+
+```
+
+layout: true
+
+<style>
+.remark-slide-number {
+  position: inherit;
+}
+
+.remark-slide-number .progress-bar-container {
+  position: absolute;
+  bottom: 0;
+  height: 4px;
+  display: block;
+  left: 0;
+  right: 0;
+}
+
+.remark-slide-number .progress-bar {
+  height: 100%;
+  background-color: #e95459;
+}
+
+</style>
+
+
+`r paste0("<div class='my-footer'><span>", params$event, "</span> <center><div class=logo><a href='https://datactivist.coop/'><img src='https://github.com/datactivist/slides_datactivist/raw/master/inst/rmarkdown/templates/xaringan/resources/img/fond_noir_monochrome.png' width='100px'></a></div></center></span></div>")` 
+
+
+---
+
+class: center, middle
+
+Ces slides en ligne : `r paste0("http://datactivist.coop/", params$slug)`
+
+Sources : `r paste0("https://github.com/datactivist/", params$slug)`
+
+
+Les productions de Datactivist sont librement réutilisables selon les termes de la licence [Creative Commons 4.0 BY-SA](https://creativecommons.org/licenses/by-sa/4.0/legalcode.fr).
+
+<BR>
+<BR>
+
+![](https://mirrors.creativecommons.org/presskit/buttons/88x31/png/by-sa.png)
+
+
+---
+### Au programme
+
+* Rappel des enseignements du benchmark
+
+* Rappel des enseignements des entretiens
+
+* Présentation des résultats issus des statistiques d'usage de data.gouv.fr
+
+* Présentation des résultats issus de l'enquête usagers
+
+
+---
+class: inverse, center, middle
+
+
+## Résultats de l'analyse des statistiques d'usage de data.gouv.fr
+
+---
+### Stats
+
+
+---
+### Catalogue
+
+
+
+---
+### Nombre de datasets par organisations
+
+```{r echo=FALSE, warning=FALSE}
+
+ggplot(nbdatasetparorga, aes(area=count, label=organization, fill=count)) + 
+  geom_treemap() + 
+  geom_treemap_text(colour = "white", reflow = T)
+```
+
+
+* `r nborga` organisations publient des données sur data.gouv.fr
+
+```{r echo=FALSE}
+nborga <- nbdatasetparorga %>% 
+  nrow()
+
+
+```
+
+]
+
+
+---
+
+
+---
+class: inverse, center, middle
+
+# Merci !
+
+Contact : [joel@datactivist.coop](mailto:joel@datactivist.coop)
+
+
