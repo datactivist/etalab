@@ -120,27 +120,26 @@ class: inverse, center, middle
 ---
 ### Nombre de datasets par organisations
 
-```{r echo=FALSE, warning=FALSE}
-
-ggplot(nbdatasetparorga, aes(area=count, label=organization, fill=count)) + 
-  geom_treemap() + 
-  geom_treemap_text(colour = "white", reflow = T)
-```
-
-
-* `r nborga` organisations publient des données sur data.gouv.fr
 
 ```{r echo=FALSE}
-nborga <- nbdatasetparorga %>% 
-  nrow()
+
 
 
 ```
 
-]
+`r nborga` organisations publient des données sur data.gouv.fr
+
 
 
 ---
+### Nombre de datasets par organisations
+
+Sur `r nborga` organisations, `r orga1daatset` organisations ne publient qu'un seul jeu de données  (`r round(percent1dataset)``)
+```{r}
+
+
+
+```
 
 
 ---
