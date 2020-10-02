@@ -14,6 +14,8 @@ library(treemapify)
 library(questionr)
 library(gouvdown)
 library(lubridate)
+library(ggthemes)
+
 ```
 
 
@@ -63,25 +65,39 @@ percent_1dataset <-(orga1dataset*100) / nborga
 ```{r}
 # histogramme du nombre de datasets par orga
 
-histo_datasetsorga <- nbdatasetparorga %>%
+nbdatasetparorga %>%
   filter(count < 100) %>% 
   ggplot() +
-  geom_histogram(aes(count), bins = 30) + 
-  theme_gouv()
-
-histo_datasetorga
+  geom_histogram(aes(count), bins = 30, ) + 
+  theme_few() + 
+  labs(title = "Répartition du nombre de jeux de données par producteurs", caption = "Source : catalogue data.gouv.fr, 24/09/20", x="Nombre de jeux de données publiés par organisation", y="Nombre d'organisations") + 
+  ggsave(filename = "histo_datasetorga.png", width = 7, height = 4, dpi = "retina")
 ```
 
 
 ```{r}
 # treemap du nombre de datasets par orga
 
-treemap_datasetsorga <- ggplot(nbdatasetparorga, aes(area=count, label=organization, fill=count)) + 
+ggplot(nbdatasetparorga, aes(area=count, label=organization, fill=count)) + 
   geom_treemap() + 
-  geom_treemap_text(colour = "white", reflow = T)
+  geom_treemap_text(colour = "white", reflow = T, min.size = 0.5) + 
+  theme_few() + 
+  labs(title = "Répartition du nombre de jeux de données par producteurs", subtitle = "La surface indique le nombre de jeux de données publiées par l'organisation", caption = "Source : catalogue data.gouv.fr, 24/09/20") + 
+  ggsave(filename = "treemap_datasetsorga.png", width = 7, height = 4, dpi = "retina")
 
-treemap_datasetsorga
 
+# stats sur la part du top 10 et du top 50 des orgas (désolé, c'est cracra)
+top10dataset <- nbdatasetparorga %>% 
+  head(10) %>% 
+ summarise(sum(count))
+
+top50dataset <- nbdatasetparorga %>% 
+  head(50) %>% 
+ summarise(sum(count))
+
+# en %
+percent_top10 <-(10801*100) / nrow(catalogue)
+percent_top50 <-(24231*100) / nrow(catalogue)
 ```
 
 ### Top 50 des producteurs
@@ -90,12 +106,12 @@ treemap_datasetsorga
 nbdatasetparorga_top50 <- nbdatasetparorga %>% 
   head(50)
 
-treemaptop50 <- ggplot(nbdatasetparorga_top50, aes(area=count, label=organization, fill=count)) + 
+ ggplot(nbdatasetparorga_top50, aes(area=count, label=organization, fill=count)) + 
   geom_treemap() + 
-  geom_treemap_text(colour = "white", reflow = T) + 
-labs(title = "Top 50 des producteurs sur data.gouv.fr", subtitle = "Nombre de jeux de données publiés par les 50 premiers producteurs", caption = "Source : catalogue data.gouv.fr, 24/09/20")
-
-treemaptop50
+  geom_treemap_text(colour = "white", reflow = T, min.size = 0.5) +
+  theme_few() + 
+  labs(title = "Répartition du nombre de jeux de données publiés par le top 50 des producteurs", subtitle = "La surface indique le nombre de jeux de données publiées par l'organisation", caption = "Source : catalogue data.gouv.fr, 24/09/20") + 
+  ggsave(filename = "treemaptop50.png", width = 7, height = 4, dpi = "retina")
 
 ```
 
@@ -308,9 +324,25 @@ nbdatasetpartypeorga_recode <- nbdatasetpartypeorga_clean_recode %>%
 ggplot(nbdatasetpartypeorga_clean_recode, aes(area=count, label=natureLabel_rec, fill=count)) + 
   geom_treemap() + 
   geom_treemap_text(colour = "white", reflow = T) + 
-labs(title = "Nombre de jeux de données publiés par type d'organisation", caption = "Source : catalogue data.gouv.fr, Wikidata, recodage manuel, 24/09/20")
+labs(title = "Nombre de jeux de données publiés par type d'organisation", subtitle = "Attention : certaines organisations ne sont pas identifiées dans Wikidata, recodage manuel", caption = "Source : catalogue data.gouv.fr, Wikidata, recodage manuel, 24/09/20") + 
+  theme_few() +
+  ggsave(filename = "treemaptypeorga.png", width = 7, height = 4, dpi = "retina")
+
+admincent <- nbdatasetpartypeorga_clean_recode %>% 
+  filter(natureLabel_rec == "administrations centrales") %>% 
+  select(count) %>% 
+  sum()
+  
+  
+percent_admincentrales <- (admincent * 100) / nrow(catalogue)
 ```
 # Evolution temporelle du nombre de jeu de données publiées par producteur
+
+```{r}
+# Barchart par an du nombre de jeux de données
+
+```
+
 
 ```{r}
 # calcul de l'intervalle depuis dernière maj
@@ -321,36 +353,79 @@ catalogueorga_date <- catalogue_orga_clean %>%
   mutate(joursdepuismaj = intervalle %/% days())
 
 # histogramme
-histomoisdepuismaj <- catalogueorga_date %>% 
+  catalogueorga_date %>% 
   filter(moisdepuismaj < 90) %>%  
   ggplot() + 
   geom_histogram(aes(moisdepuismaj)) +
-  scale_x_continuous(minor_breaks = seq(by = 12)) 
+  scale_x_continuous(minor_breaks = seq(by = 12)) + 
+  labs(title = "Fraicheur des jeux de données publiés sur data.gouv", subtitle = "Calcul de l'intervalle depuis la dernière date de mise à jour", caption = "Source : catalogue data.gouv.fr, 24/09/20", x="Nombre de mois depuis la dernière date de mise à jour", y="Nombre de jeux de données concernés") + 
+  theme_few() +
+  ggsave(filename = "histomoisdepuismaj.png", width = 7, height = 4, dpi = "retina")
+  
+  
+  obsoletes <- catalogueorga_date %>% 
+  filter(moisdepuismaj > 12) %>% 
+  nrow()
+  
+  percent_obsoletes <- (obsoletes * 100) / nrow(catalogueorga_date)
 
-histomoisdepuismaj
+  
 ```
 ```{r}
 # Facettes de l'histogramme selon type d'orga 
 # Attention : free scale y 
-facet_histomoisdepuismajo <- histomoisdepuismaj + 
-  facet_wrap(vars(natureLabel_rec), scales = "free_y")
+library(gghighlight)  
 
-facet_histomoisdepuismajo 
+histomoisdepuismaj + 
+  facet_wrap(vars(natureLabel_rec), scales = "free_y") +
+  labs(title = "Fraicheur des jeux de données publiés sur data.gouv", subtitle = "Par type d'organisation", caption = "Source : catalogue data.gouv.fr, Wikidata, recodage manuel, 24/09/20", x="Nombre de mois depuis la dernière date de mise à jour", y="Nombre de jeux de données concernés") + 
+  theme_few() +
+  gghighlight(natureLabel_rec == "administrations centrales") +
+  ggsave(filename = "facet_histomoisdepuismajo.png", width = 7, height = 4, dpi = "retina")
 
+
+obsoletes_admincent12 <- catalogueorga_date %>% 
+  filter(moisdepuismaj > 12, natureLabel_rec == "administrations centrales") %>% 
+  nrow()
+
+ percent_obsoletes_admincent12 <- (obsoletes_admincent * 100) / admincent
+ 
+ obsoletes_admincent48 <- catalogueorga_date %>% 
+  filter(moisdepuismaj > 48, natureLabel_rec == "administrations centrales") %>% 
+  nrow()
+
+ percent_obsoletes_admincent48 <- (obsoletes_admincent48 * 100) / admincent
 ```
 
 # Evolution temporelle du nombre de jeux de données par producteur
 ```{r}
 # changer les couleurs
-histonbdonnestypeprod <- catalogue_orga_clean %>% 
+  catalogue_orga_clean %>% 
   mutate(year = year(created_at)) %>% 
   filter(year > 2012) %>% 
   group_by(year, natureLabel_rec) %>% 
   summarise(compte = n()) %>% 
   ggplot(aes(x = year, y = compte, fill= natureLabel_rec)) +
-  geom_col()
+  geom_col() +
+  labs(title = "Nombre de jeux de données publiés par an et par type d'organisation", caption = "Source : catalogue data.gouv.fr, Wikidata, recodage manuel, 24/09/20", x="Année de publication", y="Nombre de jeux de données concernés", fill = "Type d'organisation") + 
+  theme_few() +
+  ggsave(filename = "histonbdonnestypeprod.png", width = 7, height = 4, dpi = "retina")
 
-histonbdonnestypeprod  
+
+catalogueorga_date <- catalogue_orga_clean %>% 
+  mutate(intervalle = (interval(created_at, today()))) %>% 
+  mutate(moisdepuiscrea = intervalle %/% months(1))
+
+ deconc36 <- catalogueorga_date %>% 
+  filter(moisdepuiscrea < 36, natureLabel_rec == "administrations déconcentrées") %>% 
+  nrow()
+ 
+  deconc <- catalogueorga_date %>% 
+  filter(natureLabel_rec == "administrations déconcentrées") %>% 
+  nrow()
+
+ deconc3ans <- (deconc36 * 100) / deconc
+
 ```
 
 # Taille du texte de la description 
@@ -358,15 +433,18 @@ histonbdonnestypeprod
 ```{r}
 
 # Stats sur la taille du champs description
-histo_tailletexte <- catalogueorga_date %>% 
+  catalogueorga_date %>% 
   mutate(nchardesc = nchar(description)) %>% 
   filter(nchardesc < 5000) %>% 
   ggplot() + 
-  geom_histogram(aes(nchardesc))
+  geom_histogram(aes(nchardesc)) +
+  labs(title = "Nombre de caractères du champ description", caption = "Source : catalogue data.gouv.fr, 24/09/20", x="Nombre de charactères du champ description", y="Nombre de jeux de données concernés") + 
+  theme_few() +
+  ggsave(filename = "histo_tailletexte.png", width = 7, height = 4, dpi = "retina")
 
-car180 <- catalogueorga_date %>% 
+car160 <- catalogueorga_date %>% 
   mutate(nchardesc = nchar(description)) %>% 
-  filter(nchardesc <180) %>% 
+  filter(nchardesc <160) %>% 
   nrow()
 
 car280 <- catalogueorga_date %>% 
@@ -381,12 +459,12 @@ car1000 <- catalogueorga_date %>%
 
 totaldataset <- nrow(catalogueorga_date) 
 
-percent180 <- (car180*100) / totaldataset
+percent160 <- (car160*100) / totaldataset
 percent280 <- (car280*100) / totaldataset
 percent1000 <- (car1000*100) / totaldataset
 
 
-histo_tailletexte
+
 
 ```
 
@@ -395,11 +473,16 @@ histo_tailletexte
 ```{r}
 library(stringr)
 
-histonbtags <- catalogueorga_date %>% 
+ catalogueorga_date %>% 
   mutate(nbtags = str_count(tags, ",")) %>% 
   filter(nbtags < 30) %>% 
   ggplot() + 
-  geom_histogram(aes(nbtags))
+  geom_histogram(aes(nbtags)) + 
+   labs(title = "Nombre de tags renseignés par jeux de données", caption = "Source : catalogue data.gouv.fr, 24/09/20", x="Nombre de charactères du champ description", y="Nombre de jeux de données concernés") + 
+  theme_few() +
+  ggsave(filename = "nbtags.png", width = 7, height = 4, dpi = "retina")
+
+  
 ```
 
 # Complétude de la métadonnée couverture spatiale
@@ -426,6 +509,10 @@ catalogue_orga_clean %>%
 
 ```
 
+# Croissance des visites
+
+
+# C
 
 # Nombre de vues par jeux de données
 ```{r}
@@ -443,7 +530,7 @@ catalogue_orga_clean <- catalogue_orga_clean %>%
   
 parjourparul2020_orga <- left_join(parjourparul2020, catalogue_orga_clean)
 
-sumvisitsorga <- parjourparul2020_orga %>% 
+treemap_sumvisitsorga <- parjourparul2020_orga %>% 
   drop_na(organization) %>% 
   group_by(organization) %>%
   summarise(somme = sum(nb_visits)) %>% 
@@ -451,8 +538,29 @@ sumvisitsorga <- parjourparul2020_orga %>%
   geom_treemap() + 
   geom_treemap_text(colour = "white", reflow = T)
 
-sumvisitsorga
+treemap_sumvisitsorga
 
 head(parjourparul2020_orga)
 ```
+
+```{r}
+
+# focus sur les 200 jeux de données regroupées par orga 
+
+treemap_sumvisitsorga_top50 <-  parjourparul2020_orga %>% 
+  drop_na(organization) %>% 
+  group_by(title, organization) %>%
+  summarise(somme = sum(nb_visits)) %>%
+  arrange(desc(somme)) %>% 
+  head(50) %>%
+  ggplot(aes(area=somme, label=title, subgroup=organization)) + 
+  geom_treemap() + 
+  geom_treemap_subgroup_border(colour = "white") +
+  geom_treemap_subgroup_text(place = "centre", grow = T, colour ="white", fontface = "italic", min.size = 0) +
+  geom_treemap_text(colour = "grey", alpha = 0.5, place = "bottom", reflow = T, min.size = 0)
+
+treemap_sumvisitsorga_top50
+
+
+`````
 
