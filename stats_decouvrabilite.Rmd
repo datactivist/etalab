@@ -478,7 +478,7 @@ library(stringr)
   filter(nbtags < 30) %>% 
   ggplot() + 
   geom_histogram(aes(nbtags)) + 
-   labs(title = "Nombre de tags renseignés par jeux de données", caption = "Source : catalogue data.gouv.fr, 24/09/20", x="Nombre de charactères du champ description", y="Nombre de jeux de données concernés") + 
+   labs(title = "Nombre de tags renseignés par jeux de données", caption = "Source : catalogue data.gouv.fr, 24/09/20", x="Nombre de tags renseignés", y="Nombre de jeux de données concernés") + 
   theme_few() +
   ggsave(filename = "nbtags.png", width = 7, height = 4, dpi = "retina")
 
