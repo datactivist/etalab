@@ -37,8 +37,6 @@ head(catalogue)
 ```{r}
 #import du catalogue
 
-catalogue <- read_csv2("https://www.data.gouv.fr/fr/datasets/r/f868cca6-8da1-4369-a78d-47463f19a9a3")
-head(catalogue)
 
 # compte du nombre de dataset par orga
 nbdatasetparorga <- catalogue %>% 
@@ -308,6 +306,7 @@ catalogue_orga_clean$natureLabel_rec <- fct_recode(catalogue_orga_clean$natureLa
   "autres" = "gestionnaire d'infrastructure ferroviaire",
   "autres" = "Agence de l'eau en France"
 )
+
 catalogue_orga_clean$natureLabel_rec <- fct_explicit_na(catalogue_orga_clean$natureLabel_rec, "autres")
 
 #nombre de dataset par catégories recodées
@@ -473,41 +472,57 @@ percent1000 <- (car1000*100) / totaldataset
 ```{r}
 library(stringr)
 
- catalogueorga_date %>% 
+ catalogueorga_date <- catalogueorga_date %>% 
   mutate(nbtags = str_count(tags, ",")) %>% 
-  filter(nbtags < 30) %>% 
+  filter(nbtags < 30) 
+ 
+ 
+ catalogueorga_date %>% 
   ggplot() + 
   geom_histogram(aes(nbtags)) + 
    labs(title = "Nombre de tags renseignés par jeux de données", caption = "Source : catalogue data.gouv.fr, 24/09/20", x="Nombre de charactères du champ description", y="Nombre de jeux de données concernés") + 
   theme_few() +
   ggsave(filename = "nbtags.png", width = 7, height = 4, dpi = "retina")
 
+tag10 <- catalogueorga_date %>% 
+  filter(nbtags > 2, nbtags <10) %>% 
+  nrow()
+
+
+tag10 <- (tag10*100) / totaldataset
   
 ```
+
+
 
 # Complétude de la métadonnée couverture spatiale
 ```{r}
 
-catalogueorga_date %>% 
+spatial.zones <- catalogue %>% 
   group_by(spatial.zones) %>% 
-  summarise(compte=n()) %>% 
-  filter(compte > 50) %>% 
+  summarise(compte=n()) %>%
+  arrange(desc(compte))
+
+
+spatial.zones %>% 
+  filter(compte > 20) %>% 
   ggplot() +
-  geom_col(aes(spatial.zones, compte))
+  geom_col(aes(fct_reorder(spatial.zones, compte), compte)) + 
+  coord_flip() +
+   labs(title = "Complétude du champ décrivant la couverture spatiale", subtitle = "Seules les valeurs apparaissant plus de 20 fois ont été gardées", caption = "Source : catalogue data.gouv.fr, 24/09/20", x="Nombre de jeux de données utilisant la valeur", y="Valeur dans la métadonnée couverture spatiale") + 
+  theme_few() +
+  ggsave(filename = "completude.png", width = 7, height = 4, dpi = "retina")
 
+
+  spatialna <- spatial.zones %>% 
+    filter(!is.na(spatial.zones)) %>% 
+    nrow()
+  
+  percentnaspatial <- (spatialna*100) / totaldataset
+  
 ```
 
-```{r}
-library(pracma)
 
-catalogue_orga_clean %>% 
-  mutate(identique = strcmp(title, description)) %>% 
-  group_by(identique) %>% 
-  summarise(count = n()) %>% 
-  ggplot() + 
-  geom_col(aes(identique, count))
-
-```
 
 # Croissance des visites
 
