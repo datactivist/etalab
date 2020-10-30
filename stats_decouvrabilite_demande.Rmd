@@ -1,0 +1,134 @@
+---
+title: "stats_decouvrabilite_demande"
+author: "Samuel Goëta"
+date: "10/29/2020"
+output: html_document
+---
+
+
+```{r}
+
+library(tidyverse)
+library(skimr)
+library(treemapify)
+library(questionr)
+library(lubridate)
+library(ggthemes)
+
+```
+
+# Nombre de vues par jeux de données
+```{r}
+
+get_df_id <- function(url) {stringr::str_extract(url, "(?<=/fr/datasets/)[a-zA-Z0-9\\-]+(?=/)")}
+# fonction pour extraire l'identifiant du jeu de données
+
+parjourparul2020 <- read.csv("https://static.data.gouv.fr/resources/nombre-de-visiteurs-par-jour-depuis-2014-des-url-de-data-gouv-fr-1/20201002-023308/20200101-20200916-parjour-parurl.csv")
+# import des données du nombre de visite par jour par URL en 2020 
+
+parjourparul2020 <-parjourparul2020 %>% 
+  mutate(df_id = get_df_id(label))
+# extraire l'identifiant du jeu de données
+
+catalogue_orga_clean <- catalogue_orga_clean %>% 
+    mutate(df_id = get_df_id(url))
+# extraire l'identifiant du catalogue (dans stats_decouvrabilite.Rmd)  
+
+parjourparul2020_orga <- left_join(parjourparul2020, catalogue_orga_clean)
+
+treemap_sumvisitsorga <- parjourparul2020_orga %>% 
+  drop_na(organization) %>% 
+  group_by(organization) %>%
+  summarise(somme = sum(nb_visits)) %>% 
+  ggplot(aes(area=somme, label=organization, fill=somme)) + 
+  geom_treemap() + 
+  geom_treemap_text(colour = "white", reflow = T)
+
+treemap_sumvisitsorga
+
+```
+
+```{r}
+
+# focus sur les 200 jeux de données regroupées par orga 
+
+treemap_sumvisitsorga_top50 <-  parjourparul2020_orga %>% 
+  drop_na(organization) %>% 
+  group_by(title, organization) %>%
+  summarise(somme = sum(nb_visits)) %>%
+  arrange(desc(somme)) %>% 
+  head(50) %>%
+  ggplot(aes(area=somme, label=title, subgroup=organization)) + 
+  geom_treemap() + 
+  geom_treemap_subgroup_border(colour = "white") +
+  geom_treemap_subgroup_text(place = "centre", grow = T, colour ="white", fontface = "italic", min.size = 0) +
+  geom_treemap_text(colour = "grey", alpha = 0.5, place = "bottom", reflow = T, min.size = 0)
+
+treemap_sumvisitsorga_top50
+
+
+```
+
+
+
+
+```{r}
+rankvisits <- parjourparul2020_orga %>% 
+  group_by(organization) %>% 
+  summarise(nbdatasets = length(unique(id)), nbvisites = sum(nb_visits)) %>% 
+  mutate(rankvisit = dense_rank(desc(nbvisites)), rankdataset = dense_rank(desc(nbdatasets)))
+
+rankvisits_tidy <- rankvisits %>% 
+  mutate(scorevisit = rankvisit) %>% 
+  pivot_longer(cols = c(rankvisit,rankdataset), names_to = "nb", values_to = "values")
+
+rankvisits_tidy %>% 
+  drop_na() %>% 
+  filter(scorevisit < 20) %>% 
+  ggplot(aes(x = fct_reorder(organization, desc(scorevisit)), y = values, group = nb, fill=nb)) +
+  geom_col(position = "dodge") + 
+  coord_flip()
+
+rankvisits %>% 
+  drop_na() %>% 
+  filter(rankvisit < 20) %>% 
+  ggplot(aes(x = fct_reorder(organization, desc(rankvisit)), y = nbdatasets)) +
+  geom_col() + 
+  coord_flip()
+  
+rankvisits %>% 
+  drop_na() %>% 
+  group_by(nbdatasets) %>% 
+  summarise(nbvisits = sum(nbvisites)) %>% 
+  ggplot() +
+  geom_point(aes(nbdatasets, nbvisits, size=nbvisits)) +
+  scale_y_log10() 
+ 
+```
+
+## Discussions
+```{r}
+
+discussions <- read_csv2("https://www.data.gouv.fr/fr/datasets/r/d77705e1-4ecd-461c-8c24-662d47c4c2f9")
+
+
+discussions %>% 
+  ggplot() + 
+  geom_histogram(aes(size))
+
+nbdisc <- nrow(discussions)
+
+size1 <- discussions %>% 
+  filter(size == 1) %>% 
+  nrow()
+
+size1 *100 / nbdisc
+
+closed <- discussions %>% 
+  filter(!is.na(closed)) %>% 
+  nrow()
+
+closed *100 / nbdisc
+
+```
+

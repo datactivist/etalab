@@ -594,6 +594,7 @@ treemap_sumvisitsorga_top50 <-  parjourparul2020_orga %>%
 treemap_sumvisitsorga_top50
 
 
+<<<<<<< HEAD
 
 csumvisitsorga_top100 <-  parjourparul2020_orga %>% 
   drop_na(organization) %>% 
@@ -609,6 +610,36 @@ ggplot(aes(area=somme, label=title, subgroup=organization)) +
   geom_treemap_subgroup_text(place = "centre", reflow = T, colour ="white", fontface = "italic", min.size = 0) +
   geom_treemap_text(colour = "grey", alpha = 0.5, place = "bottom", reflow = T, min.size = 0)
 `````
+=======
+```
+
+
+## Discussions
+```{r}
+
+discussions <- read_csv2("https://www.data.gouv.fr/fr/datasets/r/d77705e1-4ecd-461c-8c24-662d47c4c2f9")
+
+
+discussions %>% 
+  ggplot() + 
+  geom_histogram(aes(size))
+
+nbdisc <- nrow(discussions)
+
+size1 <- discussions %>% 
+  filter(size == 1) %>% 
+  nrow()
+
+size1 *100 / nbdisc
+
+closed <- discussions %>% 
+  filter(!is.na(closed)) %>% 
+  nrow()
+
+closed *100 / nbdisc
+
+```
+>>>>>>> 16cde134d4e6ce89914b8646824a664ba2303ccf
 
 ```{r}
 
