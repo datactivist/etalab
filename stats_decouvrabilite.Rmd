@@ -577,5 +577,32 @@ treemap_sumvisitsorga_top50 <-  parjourparul2020_orga %>%
 treemap_sumvisitsorga_top50
 
 
-`````
+```
+
+
+## Discussions
+```{r}
+
+discussions <- read_csv2("https://www.data.gouv.fr/fr/datasets/r/d77705e1-4ecd-461c-8c24-662d47c4c2f9")
+
+
+discussions %>% 
+  ggplot() + 
+  geom_histogram(aes(size))
+
+nbdisc <- nrow(discussions)
+
+size1 <- discussions %>% 
+  filter(size == 1) %>% 
+  nrow()
+
+size1 *100 / nbdisc
+
+closed <- discussions %>% 
+  filter(!is.na(closed)) %>% 
+  nrow()
+
+closed *100 / nbdisc
+
+```
 

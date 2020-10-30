@@ -1,0 +1,931 @@
+---
+title: "Enquête usagers, découvrabilité des données"
+author: "Céline Goffette"
+date: "22 octobre 2020"
+output:
+  
+  word_document: 
+    toc: yes
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+library(questionr)
+library(tidyverse)
+library(tidyr)
+library(gtsummary)
+library(expss)
+library(flextable)
+library(officer)
+library(officedown)
+library(GGally)
+library(scales)
+
+theme_gtsummary_language("fr", decimal.mark = ",", big.mark = " ")
+
+
+# Chargement données ----
+
+setwd("C:/Users/goffette/Desktop/Celine/Mission_datactivist/Donnees")
+
+u <- read.table(file = "enquete_datagouvfr___usagers.csv", sep = ",", encoding = "UTF-8")
+u <- u[-c(1,2,3),]
+
+
+# Création de variables, recodages ----
+
+u$un <- rep(1,nrow(u))
+
+u$public <- as.integer(str_detect(u$V2, "agent-e de la fonction publique"))
+u$prive <- as.integer(str_detect(u$V2, "salarié-e du privé"))
+u$chercheur <- as.integer(str_detect(u$V2, "chercheur ou chercheuse"))
+u$enseignant <- as.integer(str_detect(u$V2, "enseignant-e"))
+u$statistiques <- as.integer(str_detect(u$V2, "statisticien-ne, data scientist, data analyst"))
+u$developpement <- as.integer(str_detect(u$V2, "développeuse / développeur informatique"))
+u$journaliste <- as.integer(str_detect(u$V2, "journaliste"))
+u$militant <- as.integer(str_detect(u$V2, "militant-e"))
+u$etudiant <- as.integer(str_detect(u$V2, "étudiant-e"))
+u$autreprofession <- as.integer(str_detect(u$V2, "autre"))
+
+u$pastrouve <- as.integer(str_detect(u$V20, "Le jeu de données n'existait pas ou je n'ai pas réussi à le retrouver via le moteur de recherche, les catégories"))
+u$disparu <- as.integer(str_detect(u$V20, "Le jeu de données n'existait plus : une page existait avec un lien mort"))
+u$format <- as.integer(str_detect(u$V20, "Le jeu de données n'avait pas un format exploitable pour moi"))
+u$documentation <- as.integer(str_detect(u$V20, "Le jeu de données était mal documenté, je n'ai pas su comment l'utiliser"))
+u$granularite <- as.integer(str_detect(u$V20, "Le jeu de données n'avait pas la bonne granularité, les bonnes métadonnées"))
+u$confiance <- as.integer(str_detect(u$V20, "Je n'avais pas confiance dans les données proposées"))
+u$autreraison <- as.integer(str_detect(u$V20, "autre"))
+
+u$moteur <- as.integer(str_detect(u$V23, "accès direct via moteur de recherche"))
+u$blog <- as.integer(str_detect(u$V23, "article de blog"))
+u$categories <- as.integer(str_detect(u$V23, "catégories thématiques"))
+u$interne <- as.integer(str_detect(u$V23, "moteur de recherche interne"))
+u$autreacces <- as.integer(str_detect(u$V23, "autre"))
+
+u$coronavirusV21 <- str_detect(u$V21, "covid|Covid|COVID|coronavirus|cluster")
+u$coronavirusV22 <- str_detect(u$V22, "covid|Covid|COVID|coronavirus|cluster")
+u$coronavirusV24 <- str_detect(u$V24, "covid|Covid|COVID|coronavirus|cluster")
+u$coronavirusV29 <- str_detect(u$V29, "covid|Covid|COVID|coronavirus|cluster")
+u$coronavirus <- ifelse(u$coronavirusV21 == TRUE | u$coronavirusV22 == TRUE | u$coronavirusV24 == TRUE | u$coronavirusV29 == TRUE, TRUE, FALSE)
+
+u$V3_rec <- fct_recode(u$V3,
+  "Fortes" = "Fortes : vous manipulez souvent des données ou des bases de données, vous maîtrisez un ou plusieurs langage(s) de programmation, vous avez déjà développé un outil basé sur des données...",
+  "Minimes" = "Minimes : vous avez déjà vu des jeux de données mais vous n'avez pas su les exploiter",
+  "Moyennes" = "Moyennes : vous savez manipuler plusieurs formats de données, faire quelques calculs ou agrégations, visualiser des données sans vous tromper"
+)
+
+u$V11_rec <- fct_recode(u$V11,
+  "Peu formé" = "Non, pas vraiment, ou très peu",
+  "Central" = "Oui, c'est au coeur de ma formation (mathématiques, économie, statistique,  data science, big data...)",
+  "Présent" = "Oui, c'est présent dans ma formation, mais pas de manière centrale (informatique, gestion, sciences sociales...)"
+)
+
+u$V12_rec <- fct_recode(u$V12,
+  "Non" = "non",
+  "Oui" = "oui"
+)
+
+u$V19_rec <- fct_recode(u$V19,
+  "Rien" = "je ne cherchais rien de particulier",
+  "Non" = "non",
+  "Oui" = "oui"
+)
+
+u$V20_rec <- fct_recode(u$V20,
+NULL = ""
+)
+
+u$V21_rec <- fct_recode(u$V21,
+  NULL = "",
+  "Données datées" = "2 campagnes de retard ... https://www.data.gouv.fr/fr/datasets/impots-locaux/",
+  "Problème téléchargement" = "Aucune API ne permet de récupérer les derniers jeux de données uploadés (ou alors je ne l'ai pas trouvée =>pb de documentation)",
+  "-" = "Autre",
+  "-" = "Beaucoup d'informations sont disponibles. Je les ai surtout consultes pendant le confinement sur la COVID. ",
+  "-" = "Bonjour et bienvenue Merci Pour votre visite et à bientôt",
+  "-" = "carte précise et journalière des clusters et de leur évolution",
+  "Le jeu de données n'existait pas" = "certains jeux de données y étaient, d'autres manquaient",
+  "-" = "ci-dessous",
+  "-" = "covid19",
+  "Je ne cherchais rien de particulier" = "Curieux de nature",
+  "Je ne cherchais rien de particulier" = "Curieux et decouverte",
+  "Je ne cherchais rien de particulier" = "curiosité",
+  "-" = "D",
+  "-" = "Difficile d'avoir une démarche exploratoire sur data.gouv",
+  "-" = "difficulté d'exploitation de l'API sirene v3 à une liste de code SIREN en entrée",
+  "Données datées" = "données 2019-2020 pas encore renseignées",
+  "Données datées" = "données cherchées trop anciennes",
+  "Je n'avais pas confiance dans les données proposées" = "données invraisemblables",
+  "Données datées" = "données non actualisées",
+  "Données datées" = "données obsolètes",
+  "Données datées" = "données obsolètes (non mise à jour) ",
+  "Données datées" = "données obsolètes, présentation biaisée",
+  "Données datées" = "Données parfois trop anciennes, pas de mise à jour récente",
+  "-" = "données sur les transactions immobilières pas faciles à trouver",
+  "Données datées" = "Données trop anciennes, plusieurs années....",
+  "Ergonomie" = "Ergonomie lamentable ",
+  "Je n'avais pas confiance dans les données proposées" = "Erreurs dans le jeu de données sans mises à jour de corrections",
+  "Le jeu de données n'existait plus" = "Il n'y a plus les tableaux sitadel2",
+  "-" = "il n'y aplus de mise à jour des données d'urgences covid à l'échelle nationale",
+  "-" = "Il y des personnes que je ne trouve pas alors qu’elles sont nées et mortes en France",
+  "Ergonomie" = "Illisibles sur smartphone",
+  "Le jeu de données n'existait plus" = "Impossible de retrouver la page",
+  "-" = "incompréhensible",
+  "-" = "IRIS",
+  "-" = "J'ai trouve c que je cherche",
+  "Le jeu de données n'existait pas" = "J'ai trouvé les jeux de donnée au format adéquat pour plusieurs départements mais pas celui sur lequel je travaille",
+  "-" = "j'avais peur d’aggraver mon cas",
+  "-" = "Je cherchais des exemples à exploiter au service des étudiants",
+  "-" = "Je cherche des courbes sur l’évolution de la COVID-19",
+  "-" = "Je découvre ",
+  "-" = "je n'ai pas confiance - je trouve les data sites sciemment compliqués pour embrouiller les esprits, empêcher les gens de trouver",
+  "Données datées" = "Je n'ai pas exactement trouvé ce que je cherchais, car les données n'étaient pas actualisées",
+  "-" = "Je n'ai pas trouvé car je pense que ce que je cherchais n'est pas disponible sur internet mais uniquement en format papier",
+  "-" = "Je n'ai pas trouvé d'information sur l'évolution du nombre de décès",
+  "-" = "Je n'étais pas sur le bon site.",
+  "Je ne cherchais rien de particulier" = "je ne cherchais rien aujourd'hui",
+  "Je ne cherchais rien de particulier" = "je ne cherchais rien de particulier ",
+  "-" = "je ne sais pas comment faire",
+  "-" = "Je préfère les données des sites producteurs dont les métadonnées sont harmonisées ",
+  "-" = "Je recherchais les types de données accessibles et dans quels contextes les utiliser et en diffuser",
+  "-" = "Je recherche un outil d'analyse utilisé par l'état français",
+  "Je ne cherchais rien de particulier" = "je suis arrivée sur ce site par hasard, curiosité inellectuelle seulement :) ",
+  "-" = "je vais voir",
+  "-" = "je viens juste de m'inscrire ",
+  "Je ne cherchais rien de particulier" = "je zonais sur l'internet !",
+  "Données datées" = "Jeu de donnée pas mis à jour depuis des années (ex. accidents corporels, catastrophes naturelles,",
+  "Données datées" = "jeu de données pas à jour",
+  "Données datées" = "jeu non mis à jour ",
+  "Le jeu de données était mal documenté" = "Jeux de donnée non sémantisé",
+  "-" = "Konesekou677@htlmcompany.sr ",
+  "-" = "la page et les données ne peuvent s´obtenir. Erreur pour obtenir le fichier correspondant au Protocole des Gouvernements de 2004",
+  "Le jeu de données n'existait pas" = "la recherche n'abouti pas ",
+  "-" = "le format csv pour les données hospitalières covid-19 pour import sur Excel me convient bien",
+  "Données datées" = "Le jeu de données était trop vieux",
+  "Lien mort" = "Le jeu de données existe (je l'ai déjà consulté) mais sont lien a été modifié.",
+  "Données datées" = "Le jeu de données n'est pas à jour - 6 mois de retard",
+  "-" = "Le jeu de données quotidien n'a pas été téléchargé à l'heure ce jour",
+  "Lien mort" = "Le lien pour télécharger des fiches du RNCP ne fonctionnait pas",
+  "-" = "les données covdi pas à jour",
+  "Données datées" = "Les données ne sont pas actualisées et très souvent incomplètes ou pré-machées",
+  "Je ne cherchais rien de particulier" = "m'amuser",
+  "Données datées" = "manque d'actualité des données",
+  "-" = "Me souviens plus",
+  "-" = "Me tenir informée",
+  "-" = "mon ignorance quant à un décès dans ma famille",
+  "-" = "Never",
+  "-" = "Omission de données",
+  "-" = "on ne trouve pas toujours les données, parfois oui et parfois non",
+  "-" = "On tombe sur n'importe quoi SAUF sur les résultats (même provisoires) du 2° tour par bureau de vote",
+  "-" = "Ou ?",
+  "Je ne cherchais rien de particulier" = "parce que je ne cherchais rien de particulier ",
+  "Données datées" = "Pas à jour/millésime suffisamment récent",
+  "Je ne cherchais rien de particulier" = "pas de besoin précis ",
+  "-" = "Pas de concordance",
+  "-" = "pas tout à fait ",
+  "-" = "Pour accéder au portail .gouv.fr on accepte des cookies sur son appareil. J'ai voulue regarder ce qu'il advient de mes données",
+  "-" = "pré-recherche",
+  "-" = "prévisualisation des isbn plante",
+  "-" = "reintegration pour les gens(sans aucune Nationalite) francais qui ont perdu la NFF",
+  "-" = "s.o.",
+  "Données datées" = "Trop ancien ",
+  "-" = "trop vieux - pas actualisé",
+  "-" = "Verifier les classements",
+  "-" = "Yass",
+  "-" = "YOUTUBE TWITCH"
+)
+
+u$V23_rec <- fct_recode(u$V23,
+NULL = ""
+)
+
+u$V24_rec <- fct_recode(u$V24,
+  NULL = "",
+  "saisie directe" = " - accès direct par saisie dans la barre d'adresse de mon navigateur\n - intégration à mon outil heuristique (pearltrees.com) ",
+  "un site" = "à partir du site Formco",
+  "moissonnage" = "A travers transport.data.gouv.fr ou des moissonneurs de data.gouv.fr (Google Dataset Search, European Data Portal, outil interne)",
+  "un site" = "Accès direct via lien du site producteur de données",
+  "-" = "Achète",
+  "un site" = "ameli",
+  "-" = "Aparu après oreplainte en ligne ",
+  "-" = "Application prix immo",
+  "article de journal" = "Article de journal",
+  "-" = "Autre participant aux encyclopédie et ressources photo  liées à Wikipédia",
+  "-" = "Bonjour je suis Samira créatrice et au top de ma forme aujourd'hui j'espère que vous vous êtes préparer a rentrée qui vas j'en suis sûre être un bruyante etc merci donc je vous fais confiance pour nous préparer avance un bon chocolat ou café Séverine merci\n",
+  "-" = "bookmark",
+  "-" = "Bouche à oreille",
+  "-" = "bulletin d'information/notification (mail, Twitter...)\narticles de presse/TV ou sites internet d'informations",
+  "-" = "ça existe encore BING ?!?! ^^",
+  "-" = "Collègue ",
+  "-" = "dans les sources transmises entre agents",
+  "un site" = "dashboard.covid19.data.gouv.fr qui référençait le jeu de données ",
+  "-" = "Datamanager de mon hôpital",
+  "un site" = "Depuis le site ONISR",
+  "un site" = "des pages présentant les jeux de données (ex : site de l'ARCEP)",
+  "un site" = "Données INSEE liées aux sites généalogiques",
+  "un site" = "DVF",
+  "moteur de recherche externe" = "En cherchant dans tous les sens via Google ",
+  "réseaux sociaux" = "Facebook, Twitter, Flipboard",
+  "-" = "Flux RSS de data.gouv.fr",
+  "-" = "formation",
+  "un site" = "généanet.org",
+  "-" = "geo.",
+  "un site" = "gouvernement.fr",
+  "un site" = "Grâce à l ARS",
+  "un site" = "https://www.arcep.fr/cartes-et-donnees/lopen-data.html",
+  "un site" = "https://www.gouvernement.fr/info-coronavirus/carte-et-donnees",
+  "un site" = "https://www.service-public.fr",
+  "un site" = "impots.gouv.fr",
+  "-" = "INFO DU PAE NANTES",
+  "-" = "information de la DGEFP sur des données disponibles de France Compétences",
+  "-" = "invitation a remplir un document",
+  "article de journal" = "J'ai lu un article dans les Dernières Nouvelles d'Alsace. Des viticulteurs alsaciens exprimaient leurs craintes de voir se tarir le flux des Belges à fort pouvoir d'achat dans les caves.",
+  "-" = "Je cherchais des données sur le Covid-19",
+  "-" = "Je connais les sites fiables",
+  "-" = "Je n'ai pas réussi à y accéder pour cause de liens qui se rebouclent ou absents.",
+  "-" = "Je ne connais rien au numérique",
+  "-" = "je ne sais plus\nje savais que cela existait",
+  "moteur de recherche interne" = "Jeux de données suivi sur mon compte data.gouv.fr\nRecherche interne par producteur",
+  "article de journal" = "journal Sud Ouest ",
+  "-" = "Journal télévisé",
+  "-" = "La recherche sur datagouv suppose souvent de connaître au préalable le nom de ce que l'on cherche;",
+  "-" = "Le plus souvent je n'ai pas a priori en tête un jeu de données précis. Je cherche si des données sur tel thème existent  (avec recherche en parallèle sur les sites spécialisées ministériels ou territoriaux ou européens). Je recherche souvent en format ouvert, des données correspondant à des tableaux consultés dans des publications numériques (malheureusement en PDF).",
+  "-" = "les publications de https://www.santepubliquefrance.fr ne m'informaient plus assez",
+  "-" = "Lettre de la FMF",
+  "-" = "Lien",
+  "-" = "Lien communiqué par un collègue.",
+  "-" = "lien covid",
+  "-" = "Lien dans manuel scolaire d'enseignement de l'informatique en classe de seconde",
+  "un site" = "Lien donné par Santé Publique France",
+  "réseaux sociaux" = "liste de discussion OpenStreetMap France",
+  "réseaux sociaux" = "liste talk-fr@openstreetmap.org",
+  "-" = "Mail d'un ami",
+  "moteur de recherche externe" = "moteur de recherche",
+  "-" = "Never for you this week..thanks !!!",
+  "moteur de recherche interne" = "open data site meteofrance.com référencé sur data.gouv.fr",
+  "un site" = "open street map org",
+  "moteur de recherche externe" = "Opéra, Internet Explorer et Microsoft Edge. Dans la 1ère réponse, j'utilise que Google et Bing. Pour être juste le moteur de recherche est Google le plus installé dans les navigateurs mais ils sont aussi leurs moteurs de recherches donc souvent les liens donne erreur ou lin mort ",
+  "un site" = "par le biais de Covid tracker de Guillaume Rozier",
+  "-" = "Par une autre personne",
+  "article de journal" = "Presse",
+  "-" = "Pub",
+  "-" = "Recherche d'info sur l'équipement de bornes électriques pour voiture en france",
+  "moteur de recherche interne" = "Recherche directe, je connaissait Data.gouv",
+  "moteur de recherche externe" = "recherche internet",
+  "moteur de recherche interne" = "Recherche par producteur",
+  "un site" = "renvoi par un lien d'un site internet",
+  "réseaux sociaux" = "Réseaux Sociaux de la CNIL",
+  "un site" = "santé publique France\n",
+  "un site" = "Site de l'Arcep qui a plusieurs liens vers data.gouv.fr",
+  "un site" = "site du gouvernement.fr",
+  "un site" = "Site gouvernement.fr",
+  "un site" = "Site santé publique france à propos du coronavirus",
+  "un site" = "sollicité par mail",
+  "réseaux sociaux" = "Suivants les jeux cherchés. Aussi via des listes de dffusion.",
+  "-" = "the past couple of weeks, news headlines have been singularly focused on a government agency that most people have not thought too much about until recently: the United States Postal Service. Voting advocates, election administrators, and Congress are ringing the alarm about how Postmaster General Louis DeJoy, a Trump mega-donor with zero Postal Service experience, has been implementing new operational changes that are slowing down mail services, in an apparent attempt to sabotage voting by mail come November. On August 18, in response to the intense public outcry, the postmaster general declared that he would be rolling back some of these changes. Meanwhile, the Covid-19 pandemic is devastating families, disrupting our way of life, and is having a disproportionate impact on Black, Indigenous, and Latinx people. We are all very rightfully worried about exposure to Covid-19 at in-person voting locations this fall, which is obviously why absentee voting (or mail-in voting) has become an ideal option for many. Understandably, a disrupted Postal Service is sowing much distrust and confusion with voters about whether absentee voting is a viable option after all. I write today to join the chorus of advocates speaking loud and clear that despite disruptions at the Postal Service, you can still vote securely by mail in the 2020 general election, as long as you are vigilant, equipped with some voter education, and you prioritize doing so early. And below, I describe some steps you should be taking right now to do so. It’s all about acting early and carefully following your specific state law requirements to vote by mail. But before I begin, I humbly request that you first take a deep breath. Please let it sink in that you can indeed vote by mail, given you are informed and are vigilant about taking the necessary steps as soon as possible. I say this because I do not take lightly the harmful psychological impact that the current president and his allies are having on confidence and trust in absentee voting, and in our election system in general, by recklessly spreading disinformation and lies about ballot security. We already know foreign election interference that targets and discourages voters, especially Black and brown voters, is a real threat. So it is really absurd that the president is also suppressing voting. However, I strongly maintain that we can indeed mitigate these nefarious attempts to obstruct access to the ballot and our voting power. We really can. It’s all about acting early and carefully following your specific state law requirements to vote by mail. And here are a few steps: First, register to vote or make sure your registration is still active right now. Do not wait until tomorrow or next week. Do it right now. You would be surprised about how strict some states are with their voter registration deadlines. Also, if you haven’t voted for a few years or if your address isn’t current, you may get purged from the voter rolls. If you miss the deadline in some states, you may be out of luck and won’t be able to vote, unless the state permits same-day registration. Forty states and Washington, D.C. allow you to register online — find out what your state offers and register. Second, apply as early as possible for an absentee ballot (referred to as a mail-in ballot in some states). A large majority of states allow for no-excuse absentee voting or have recently legislated to allow you to use fear of Covid-19 as a valid excuse, meaning that any registered voter qualifies for an absentee ballot. Visit your state elections website and find out what your state allows for. Once the absentee ballot request period opens, request your absentee ballot or fill out the absentee ballot application immediately. Do not wait. Track the process. Make sure that if you do not receive your ballot by mail in a timely fashion, follow up with the applicable election office. Please note that as of today, nine states (Colorado, Hawaii, Oregon, Utah, Washington, California, Nevada, New Jersey, Vermont) and Washington, D.C. will be sending every active registered voter an absentee ballot. Also, 10 other states (Connecticut, Delaware, Illinois, Iowa, Ohio, Massachusetts, Maryland, Michigan, Nebraska, Wisconsin) will be automatically mailing an absentee ballot application to every active registered voter. So if you luckily live in one these states, as long as your registration is active, be on the lookout for your mail. And again, track the process. Missing a requirement can lead to your ballot",
+  "réseaux sociaux" = "Twitter",
+  "réseaux sociaux" = "twitter post",
+  "-" = "Un Ami me l'a recommandé\n",
+  "un site" = "Un site de chercheurs en généalogie",
+  "un site" = "via le site de Santé Publique France",
+  "un site" = "Vous êtes référencé sur OpenClassroom",
+  "un site" = "wikipedia",
+  "un site" = "www.lecompteasso.associations.gouv.fr",
+  "-" = "Yass"
+)
+
+u$V29_rec <- fct_recode(u$V29,
+NULL = ""
+)
+
+# Données format long ----
+
+ulong_prof <- u %>% 
+  pivot_longer(
+    cols = public:autreprofession,
+    names_to = "profession", 
+    values_to = "cases", 
+      )
+
+ulong_raison <- u %>% 
+  pivot_longer(
+    cols = pastrouve:autreraison,
+    names_to = "raison", 
+    values_to = "cases", 
+      )
+
+ulong_acces <- u %>% 
+  pivot_longer(
+    cols = moteur:autreacces,
+    names_to = "acces", 
+    values_to = "cases", 
+      )
+```
+
+\newpage
+# Profil des répondants à l'enquête usagers 
+
+Enquête auprès des usagers de la plateforme data.gouv.fr  
+https://framaforms.org/enquete-datagouvfr-usagers-1590438305  
+N = 902 répondants 
+  
+## Activité professionnelle
+
+**"Vous vous définissez comme ?"** (plusieurs réponses possibles)
+
+- agent-e de la fonction publique *(public)*
+- salarié-e du privé *(prive)*
+- chercheur ou chercheuse *(chercheur)*
+- enseignant-e *(enseignant)*
+- statisticien-ne, data scientist, data analyst *(statistiques)*
+- développeuse / développeur informatique *(developpement)* 
+- journaliste *(journaliste)*
+- militant-e *(militant)*
+- étudiant-e *(étudiant)*
+- autre *(autreprofession)*
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% select(public, prive, chercheur, enseignant, statistiques, developpement, journaliste, militant, etudiant, autreprofession) %>%  tbl_summary()
+```
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+#u %>% tbl_summary(include = c("V2"), sort = list(everything() ~ "frequency"))
+```
+
+A noter : 227 individus ayant répondu "autre" *(autreprofession)* ont coché uniquement cette modalité. On n'a donc aucune information sur l'activité professionnelle pour un quart des répondants.  
+Malgré la possibilité de cocher plusieurs réponses, une majorité des répondants (573, soit 63%) n'a coché qu'une seule modalité. Les modalités les plus fréquemment associées sont "salarié-e du privé,statisticien-ne, data scientist, data analyst", mais cela ne concerne que 24 individus soit 2,7% (résultat non présenté ici, mais possibilité de visualiser le tableau depuis le fichier .Rmd [code en commentaire au-dessus de ce paragraphe]).
+
+
+
+## Compétences en manipulation de données
+
+**"Vous estimez que vos compétences techniques en manipulation de données sont ?"**
+
+- Fortes : vous manipulez souvent des données ou des bases de données, vous maîtrisez un ou plusieurs langage(s) de programmation, vous avez déjà développé un outil basé sur des données... *(Fortes)* 
+- Moyennes : vous savez manipuler plusieurs formats de données, faire quelques calculs ou agrégations, visualiser des données sans vous tromper *(Moyennes)*
+- Minimes : vous avez déjà vu des jeux de données mais vous n'avez pas su les exploiter *(Minimes)*
+- Non renseigné *(Manquant)*  
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V3_rec) %>%  
+mutate(V3_rec = factor(V3_rec, levels = c("Minimes","Moyennes", "Fortes"))) %>% 
+tbl_summary()
+```
+\ 
+
+**"Vous avez des compétences en manipulation de données. En particulier, vous savez"**
+
+- utiliser un ou plusieurs langage(s) de programmation *(V4)*
+- manipuler des bases de données (SQL, MySQL)... *(V5)*
+- manipuler des données textuelles *(V6)*
+- manipuler des données géographiques *(V7)*
+- créer des visualisation de données avec un logiciel (Excel, LibreOffice, Google Docs...) *(V8)*
+- créer des visualisation de données dans un langage de programmation (d3.js, ggplot...) *(V9)*
+- utiliser un outil de BI (Tableau Software, PowerBI, OpenDataSoft...) *(V10)*  
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V3_rec, V4:V10) %>%
+mutate(V3_rec = factor(V3_rec, levels = c("Minimes","Moyennes", "Fortes"))) %>%
+mutate(V4 = factor(V4, levels = c("pas du tout", "un peu", "bien", "très bien"))) %>%
+mutate(V5 = factor(V5, levels = c("pas du tout", "un peu", "bien", "très bien"))) %>%
+mutate(V6 = factor(V6, levels = c("pas du tout", "un peu", "bien", "très bien"))) %>%
+mutate(V7 = factor(V7, levels = c("pas du tout", "un peu", "bien", "très bien"))) %>%
+mutate(V8 = factor(V8, levels = c("pas du tout", "un peu", "bien", "très bien"))) %>%
+mutate(V9 = factor(V9, levels = c("pas du tout", "un peu", "bien", "très bien"))) %>%
+mutate(V10 = factor(V10, levels = c("pas du tout", "un peu", "bien", "très bien"))) %>%
+tbl_summary(by = V3_rec)
+```
+\   
+
+Les répondants jugeant leurs compétences minimes savent rarement utiliser un langage de programmation. Mais ils ont fréquemment des connaissances au minimum basiques en manipulation de données textuelles (50%) ou géographiques (40%), ou savent créer des visualisations de données avec un logiciel (60%).   
+\  
+
+**"Avez-vous été formé-e à manipuler des données ?"**
+
+- Oui, c'est au coeur de ma formation (mathématiques, économie, statistique, data science, big data...) *(Formé à la MD (central))*
+- Oui, c'est présent dans ma formation, mais pas de manière centrale (informatique, gestion, sciences sociales...) *(Formé à la MD (présent))*
+- Non, pas vraiment, ou très peu *(Pas ou peu formé à la MD)*
+- Non renseigné *(Manquant)*   
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V11_rec) %>% 
+mutate(V11_rec = factor(V11_rec, levels = c("Peu formé", "Présent", "Central"))) %>%
+tbl_summary()
+```
+\   
+Près de 8 répondants sur 10 estiment avoir des compétences moyennes ou fortes en matière de manipulation de données. Pourtant, la moitié des répondants n'a pas ou peu été formée à la manipulation de données.  
+\  
+
+**"La manipulation de données fait-elle partie de votre activité professionnelle ?"**
+
+- Oui
+- Non
+- Non renseigné *(Manquant)*  
+\     
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V12_rec) %>%  
+mutate(V12_rec = factor(V12_rec, levels = c("Oui", "Non"))) %>%
+tbl_summary()
+```
+
+\newpage   
+**Utilisation dans le cadre professionnel x formation et compétences en manipulation de données**
+\     
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V11_rec, V3_rec, V12_rec) %>% 
+mutate(V12_rec = factor(V12_rec, levels = c("Oui", "Non"))) %>%
+mutate(V3_rec = factor(V3_rec, levels = c("Minimes","Moyennes", "Fortes"))) %>%
+mutate(V11_rec = factor(V11_rec, levels = c("Peu formé", "Présent", "Central"))) %>%
+tbl_summary(by = V12_rec)
+```
+\
+La manipulation de données fait partie de l'activité professionnelle de la moitié des répondants. Mais parmi eux, 28% n'ont pas ou peu été formés à la manipulation de données, et 46% jugent leurs compétences en la matière moyennes.   
+\  
+
+    
+**"Combien de fois êtes vous déjà allé-e sur l'un ou l'autre de ces sites (data.gouv.fr, transport.data.gouv.fr, adresse.data.gouv.fr, etc. ), au total, au cours des 12 derniers mois ?"**
+
+- 1-2 fois
+- 3-10 fois
+- 11-30 fois
+- Plus de 30 fois
+- Non renseigné *(Manquant)*   
+\     
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V15) %>% 
+mutate(V15 = factor(V15, levels = c("1-2 fois","3-10 fois", "11-30 fois", "Plus de 30 fois"))) %>%
+tbl_summary()
+```
+\    
+
+\newpage
+**Fréquence d'usage x formation et compétences en manipulation de données**
+\     
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V11_rec, V3_rec, V15) %>% 
+mutate(V3_rec = factor(V3_rec, levels = c("Minimes","Moyennes", "Fortes"))) %>%
+mutate(V11_rec = factor(V11_rec, levels = c("Peu formé", "Présent", "Central")))  %>%
+mutate(V15 = factor(V15, levels = c("1-2 fois","3-10 fois", "11-30 fois", "Plus de 30 fois"))) %>%
+tbl_summary(by = V15)
+```
+\
+Un quart des répondants déclare avoir visité l'un ou l’autre des sites mentionnés (data.gouv.fr, transport.data.gouv.fr, adresse.data.gouv.fr, etc.) plus de 30 fois au cours des 12 derniers mois. Parmi ces utilisateurs fréquents, un tiers est peu ou pas formé à la manipulation de données, et un sur dix estime que ses compétences en la matière sont minimes.     
+\ 
+
+
+
+
+
+
+\newpage
+# Questions liées à la découvrabilité des données
+
+**"Vous avez parcouru le portail data.gouv.fr. Avez-vous trouvé ce que vous cherchiez ?"**  
+
+- Oui
+- Non
+- Je ne cherchais rien de particulier 
+- Non renseigné *(Manquant)*  
+\   
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V19_rec) %>%  
+mutate(V19_rec = factor(V19_rec, levels = c("Oui", "Non", "Rien"))) %>%
+tbl_summary()
+```
+\   
+Interprétation délicate des réponses à cette question, qui aurait demandé à être précisée. Par exemple : "avez-vous trouvé ce que vous cherchiez *lors de votre dernière visite* ?".  
+La question suivante portait sur les raisons expliquant pourquoi la recherche avait échoué. Les répondants ont souvent donné plusieurs raisons (alors qu'il n'était pas précisé que plusieurs réponses étaient possibles, mais le questionnaire le permettait), ce qui peut laisser penser qu'ils ont listé tous les problèmes auxquels ils ont déjà été confrontés en utilisant data.gouv.fr. Ils ont également indiqué plusieurs voies d'accès aux données (alors qu'il n'était également pas précisé que plusieurs réponses étaient possibles).  
+La moitié des répondants indiquent avoir trouvé ce qu'ils cherchaient sur data.gouv.fr. 19 % ne cherchaient rien.
+28% des répondants indiquent que leur recherche s'est soldée par un échec.  
+     
+\       
+**"Pourquoi ?"** (plusieurs réponses possibles, même si non explicitement précisé dans le questionnaire)
+
+- Le jeu de données n'existait pas ou je n'ai pas réussi à le retrouver via le moteur de recherche, les catégories *(pastrouve)*
+- Le jeu de données n'existait plus : une page existait avec un lien mort  *(disparu)*
+- Le jeu de données n'avait pas un format exploitable pour moi *(format)* 
+- Le jeu de données était mal documenté, je n'ai pas su comment l'utiliser *(documentation)*
+- Le jeu de données n'avait pas la bonne granularité, les bonnes métadonnées (trop détaillé, trop agrégé, pas assez de variables...) *(granularite)*
+- Je n'avais pas confiance dans les données proposées *(confiance)*
+- Autre *(autreraison)*
+
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+filter(!is.na(V20_rec)) %>% 
+select(pastrouve, disparu, format, documentation, granularite, confiance, autreraison) %>%  
+tbl_summary()
+```
+\   
+La question "Pourquoi ?" n'était pas filtrée, alors qu'on suppose qu'elle était implicitement dédiée aux individus qui avaient répondu "non" à la question précédente. Du fait de l'absence de filtre, certains des individus ayant répondu "oui" ou "je ne cherchais rien de particulier" ont également répondu à cette question. Au total, 371 individus ont répondu à la question (alors que seulement 243 avaient répondu "non" à la question précédente). On a décidé de garder toutes les réponses, considérant qu'elles doivent probablement être vues comme une liste de tous les problèmes déjà rencontrés par les utilisateurs de data.gouv.fr.  
+Ceux qui ont répondu "autre" précisent le plus souvent que c'est parce que les données étaient datées, n'étaient pas actualisées (exploitation ouvert **"Si vous avez coché "autre", pouvez-vous préciser ?"**) : "données cherchées trop anciennes", "données non actualisées", données obsolètes", "jeu de données pas à jour", "trop ancien".
+
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+filter(!is.na(V20_rec)) %>% 
+select(V19_rec, pastrouve, disparu, format, documentation, granularite, confiance, autreraison) %>%  
+mutate(V19_rec = factor(V19_rec, levels = c("Oui", "Non", "Rien"))) %>%
+tbl_summary(by = V19_rec)
+```
+\ 
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+#u %>% filter(!is.na(V21_rec)) %>%  select(V21_rec) %>%  tbl_summary()
+```
+     
+\newpage      
+**"Par quel chemin êtes vous arrivé à ce jeu de données ?"** (plusieurs réponses possibles, même si non explicitement précisé dans le questionnaire) 
+
+- Accès direct via moteur de recherche (Google, Bing, DuckDuckGo...) *(moteur)*
+- Article de blog *(blog)*
+- Catégories thématiques *(categories)*
+- Moteur de recherche interne data.gouv.fr *(interne)*
+- Autre *(autreacces)*
+
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+filter(!is.na(V23_rec)) %>% 
+select(moteur, blog, categories, interne, autreacces) %>%  
+tbl_summary()
+```
+\   
+Ici également la question aurait demandé à être précisée. On ne sait pas bien à quoi "*ce* jeu de données" fait référence, et à qui s'adressait cette question. Probablement à ceux ayant répondu "oui" à la question "Vous avez parcouru le portail data.gouv.fr. Avez-vous trouvé ce que vous cherchiez ?".  
+Du fait de l’absence de filtre, une part importante des individus ayant répondu “non” ou “je ne cherchais rien de particulier” a également répondu. Au total, 840 individus ont répondu à la question. On a décidé de garder toutes les réponses, considérant qu'elles doivent probablement être vues comme les différentes voies d'accès aux données auxquelles ont recours les utilisateurs de data.gouv.fr.  
+39% des répondants disent avoir trouvé le jeu de données via le moteur interne de data.gouv.fr, et 59% via un moteur de recherche externe.
+Ceux qui ont répondu "autre" précisent le plus souvent qu'ils sont arrivés au jeu de données via un autre site (exploitation ouvert **"Si vous avez répondu "autre", pouvez-vous préciser ?"**).
+
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+filter(!is.na(V23_rec)) %>% 
+select(V19_rec, moteur, blog, categories, interne, autreacces) %>%  
+mutate(V19_rec = factor(V19_rec, levels = c("Oui", "Non", "Rien"))) %>%
+tbl_summary(by = V19_rec)
+```
+\ 
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+#u %>% filter(!is.na(V24_rec)) %>%  select(V24_rec) %>%  tbl_summary()
+```
+
+# "Déterminants" de la découvrabilité
+
+
+**"Vous estimez que vos compétences techniques en manipulation de données sont ?"**  
+\   
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% select(V3_rec, V19_rec, pastrouve, disparu, format, documentation, granularite, confiance, autreraison, moteur, blog, categories, interne, autreacces) %>%  
+mutate(V3_rec = factor(V3_rec, levels = c("Minimes","Moyennes", "Fortes"))) %>%
+mutate(V19_rec = factor(V19_rec, levels = c("Oui", "Non", "Rien"))) %>%
+tbl_summary(by = V3_rec)
+```
+\   
+
+Les répondants qui estiment avoir des compétences minimes en manipulation de données trouvent un peu moins ce qu'ils cherchent (38% déclarent avoir trouvé, contre 57% pour ceux qui ont des compétences moyennes et 58% pour ceux qui ont des compétences fortes). Ils déclarent aussi plus souvent qu'ils ne recherchaient rien de particulier. Ils utilisent un peu moins le moteur de recherche interne de data.gouv.fr que les autres.  
+En ce qui concerne les problèmes rencontrés, on ne note pas beaucoup de différences en fonction du niveau de compétences. Ceux qui ont des compétences minimes déclarent un peu plus fréquemment ne pas avoir confiance dans les données, et ceux qui ont des compétences fortes citent des problèmes liés à la granularité. 
+
+\newpage
+**"Avez-vous été formé-e à manipuler des données ?"**  
+\   
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V11_rec, V19_rec, pastrouve, disparu, format, documentation, granularite, confiance, autreraison, moteur, blog, categories, interne, autreacces) %>%
+mutate(V11_rec = factor(V11_rec, levels = c("Peu formé", "Présent", "Central"))) %>%
+mutate(V19_rec = factor(V19_rec, levels = c("Oui", "Non", "Rien"))) %>%
+tbl_summary(by = V11_rec)
+```
+\   
+
+Les répondants qui sont peu ou pas formés à la manipulation de données trouvent un peu moins ce qu'ils cherchent (49% déclarent avoir trouvé, contre 60% et 55%). L'utilisation du moteur de recherche interne de data.gouv.fr croît avec le niveau de compétences déclaré.
+
+\newpage
+**"La manipulation de données fait-elle partie de votre activité professionnelle ?"**  
+\   
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(V12_rec, V19_rec, pastrouve, disparu, format, documentation, granularite, confiance, autreraison, moteur, blog, categories, interne, autreacces) %>%
+mutate(V12_rec = factor(V12_rec, levels = c("Oui", "Non"))) %>%
+mutate(V19_rec = factor(V19_rec, levels = c("Oui", "Non", "Rien"))) %>%
+tbl_summary(by = V12_rec)
+```
+\   
+Les répondants dont la manipulation de données fait partie de l'activité professionnelle trouvent plus fréquemment ce qu'ils cherchent. Ils utilisent également plus le moteur de recherche interne de data.gouv.fr.
+
+
+\newpage
+# Mentions au coronavirus dans les questions ouvertes
+
+Le questionnaire en ligne a été ouvert à partir du 26 juin 2020. Plusieurs visites sur le site data.gouv.fr ont pu être motivées par la crise sanitaire liée au coronavirus. Les termes "covid", "Covid", "COVID", "coronavirus" et "cluster" ont été recherchés dans les questions ouvertes pour déterminer
+l'ampleur de cet "effet coronavirus" sur les visites du site. 
+
+Les questions ouvertes sont les suivantes : 
+
+- [Vous avez parcouru le portail data.gouv.fr. Avez-vous trouvé ce que vous cherchiez ? Pourquoi ?] **Si vous avez coché "autre", pouvez-vous préciser ?** *(coronavirusV21)*
+- **Souhaitez-vous ajouter des précisions quant à vos réponses précédentes ?** *(coronavirusV22)*
+- [Par quel chemin êtes vous arrivé à ce jeu de données ?] **Si vous avez répondu "autre", pouvez-vous préciser ?**  *(coronavirusV24)*
+- **Avez-vous des remarques, des questions, des commentaires, que vous aimeriez nous communiquer, pour améliorer data.gouv.fr, ou pour une autre raison ?** *(coronavirusV29)*
+- Occurence dans au moins un de ces questions *(coronavirus)*   
+\  
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+select(coronavirusV21, coronavirusV22, coronavirusV24, coronavirusV29, coronavirus) %>%  
+tbl_summary()
+```
+\  
+
+Les termes "covid", "Covid", "COVID", "coronavirus" ou "cluster" sont mentionnés par 3% des individus dans leurs réponses au questionnaire. 
+
+
+
+
+\newpage
+# Sélection de verbatims liés à la découvrabilité
+
+**Avez-vous des remarques, des questions, des commentaires, que vous aimeriez nous communiquer, pour améliorer data.gouv.fr, ou pour une autre raison ?**   
+
+"A l'usage, on note la présence de nombreux jeux de données portant sur les **mêmes éléments mais publiés par des producteurs différents**. Regrouper ces données et signaler l'existence de jeux de données similaires aux producteurs seraient utiles pour améliorer la qualité des données et réduire les doubles productions inutiles."  
+  
+
+"Ayant un usage important de données concernant des territoires spécifiques et une exploitation par analyse spatiale, **une recherche par emprise géographique permettrait de faciliter la recherche de toutes les données (éventuellement ou pas géolocalisées) de ce territoire** (si les méta-données le permettent)."
+
+"C'est déjà une belle plateforme, très content qu'elle existe ! Idéalement, **ce serait intéressant que les données d'autres portails ressortent également dans le moteur de recherche (moissonnage)** pour simplifier les recherches de données (millefeuille territorial + pléthore de portails différents)."  
+  
+
+"Ce serait bien que data.gouv s'adresse à une communauté large et de façon pédagogique. **il manque une dimension de clarté de documentation rapide pour comprendre le jeu de données, dictionnaire, profondeur historique..**. Ce serait bien aussi que Etalab propose des **bonnes pratiques pour "normer" les données d'open data** - tjs le même nom pour les département, code com insee... a voir avec ce qui a été initié par Open data France auprès des collectivités...."  
+  
+"data.gouv.fr est un site de référence et parmi les mieux faits de l'écosystème des sites publics français. Sur la forme, peu de choses à redire, si ce n'est le fait que **quand un producteur référence beaucoup de jeux de données, il n'est pas toujours facile de retrouver le jeu qui nous intéresse**. On peut aussi déplorer la documentation souvent pauvre des jeux de données (description des champs...) Enfin, **la question du maintien à jour des données et des liens est cruciale : je suis souvent tombé sur des liens morts**."  
+
+"Dans le cas des antennes de l'ANFR (idem ailleurs ?), il manque un lien direct sur la dernière version des données. **Le nommage des fichiers n'est pas consistant**. Un système par date et/ou version homogène si possible dans tous les jeux serait pratique. Idem pour un filtre par date/période à minima pour trouver les fichiers, et mieux, directement sur les données De mémoire, trouver la description des "tables" n'est pas évident."  
+  
+"Déjà : merci infiniment pour ces données, c'est une mine d'or Pistes d'amélioration : **concernant les données géographiques, la navigation pourrait être améliorée en pouvant identifier l'ordre de grandeur : mondial, national, régional, départemental, intercommunal, communal** Idéalement avec une arborescence Je pense que bien séparer les dépôts de données (ex. BDD), et leurs utilisation (ex. une carte faite à partir de plusieurs jeux de données) est important pour la clarté de la navigation. C'est le cas aujourd'hui et je trouve ça profitable."  
+  
+"**Différents producteurs produisent les mêmes données plus ou moins complètes. Cela rend difficile la recherche d'un jeu de données**. Il faut ajouter un indicateur de satisfaction en plus du nombre de téléchargements. Manque de formalisme. Les jeux de données de même catégorie ont des formats différents cela rend difficile l'exploitation. Il faudrait proposer des open-format ouvert à discussion que les producteurs pourraient suivre. Il sera plus pratique de travailler avec des données de producteurs locaux. Ex portail open-data de ville."  
+  
+"**English version is not at all translated (just main menu and common areas)**. Some international projects will need more information in english to share with other European countries."  
+  
+"il faut améliorer le catalogage des données. **il faudrait pouvoir identifier facilement les données selon leur couverture géographique : 1 collectivité, 1 departement, 1 région, la france.** Il y a trop de donnée spécifique à un territoire, lorsqu'on mène une étude sur de grands territoires, la recherche n'est pas optimale."  
+  
+"Je rêve d'un **système de notification quand un dataset est mis à jour**. Typiquement sur le covid, je dois scruter les pages de Santé publique France ou du ministère de la Santé pour voir si les indicateurs de l'épidémie. Une notification (sur data.gouv, ou par mail, ou autre), simplifierait beaucoup de choses."  
+  
+"La gestion des dates (création, méta, données) est parfois erronée et au minimum perturbante. Selon la façon dont on met à jour les données, la date de mise à jour est mise à jour ... ou pas. Il faut remettre tout ça à plat et choisir un système simple, lisible et fiable. Le site est submergé de micro jeux de données qui n'en sont pas ou sont des extraits locaux d'un jeu plus général. Il faut trouver une façon de mieux mettre en valeur les vrais jeux de données. Le statistiques de vues et téléchargements sont totalement fantaisistes (certains graphiques semblent d'ailleurs avoir été partiellement retirés). Ce n'est pas sérieux pour un portail et cela empêche d'avoir des indices sur "quels sont les vrais jeux de données utiles". **Il ne semble pas y avoir d'archivage accessible : si un producteur met à jour son jeu de données, je ne peux pas accéder aux anciennes versions. L'historisation et la non répudiation sont pourtant des conditions importantes d'un bon portail.** Cela signifie qu'on ne peut pas faire des visualisations sur des évolutions dans le temps sans faire soi-même l'effort d'archiver régulièrement. Le moteur de recherche est catastrophique. L'ordre de présentation des résultats est douteux. Les résultats fournis en auto-suggestion pendant l'autocomplétion ne sont pas cohérents (nombre, filtre, ordre) avec ceux renvoyés une fois qu'on appuie sur "Entrée". Il y a régulièrement des problèmes de versions des pages mises dans une cache sûrement car, après avoir modifié la description d'un jeu de données, il est fréquent de retomber sur l'ancienne version quand on passe sur la page pour contrôler. C'est perturbant."  
+ 
+
+\newpage
+# Propositions de slides pour la présentation des résultats
+
+## Slide 1 : L'enquête auprès des usagers de data.gouv.fr  
+
+L'enquête auprès des usagers de data.gouv.fr a débuté le 26 juin 2020  
+
+902 personnes ont répondu à l'enquête  
+
+Le questionnaire comportait des questions sur la découvrabilité des données :
+
+- Vous avez parcouru le portail data.gouv.fr. Avez-vous trouvé ce que vous cherchiez ? (oui / non / je ne cherchais rien de particulier)
+- Pourquoi ? (6 raisons possibles + autre)
+- Si vous avez coché "autre", pouvez-vous préciser ? (question ouverte)
+- Souhaitez-vous ajouter des précisions quant à vos réponses précédentes ? (question ouverte)
+- Par quel chemin êtes vous arrivé à ce jeu de données ? (4 accès possibles + autre)
+- Si vous avez répondu "autre", pouvez-vous préciser ? (question ouverte)    
+
+\newpage 
+## Slide 2 : Plus de gens du privé que du public, et des activités professionnelles variées 
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+ulong_prof %>% 
+  group_by(profession) %>% 
+  summarise(mean_cases = mean(cases)) %>% 
+  ggplot() +
+  geom_col(aes(y = reorder(profession, mean_cases), x = mean_cases), na.rm=TRUE) +
+  labs(title = "Activité professionnelle des répondants", x="%", y="Activité professionnelle") +
+  scale_x_continuous(labels = percent) +
+  ggsave(filename = "profession.png", width = 7, height = 4, dpi = "retina")
+```
+
+
+NB : plusieurs réponses étaient possibles  
+227 individus ayant répondu “autre” ont coché uniquement cette modalité. On n’a donc aucune information sur l’activité professionnelle pour un quart des répondants  
+
+
+\newpage
+## Slide 3 : Des usagers pas tous rompus à la manipulation de données
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+plotdata <- u %>%
+count(V3_rec) %>%
+arrange(desc(V3_rec)) %>%
+mutate(prop = round(n * 100 / sum(n), 1), lab.ypos = cumsum(prop) - 0.5  *prop)
+  
+plotdata$label <- paste0(plotdata$V3_rec, "\n",
+                         round(plotdata$prop), "%")
+plotdata %>%
+mutate(V3_rec = factor(V3_rec, levels = c("Minimes","Moyennes", "Fortes"))) %>%
+ggplot(aes(x = 2, y = prop, fill = V3_rec)) +
+geom_bar(width = 1, stat = "identity", color = "white") +
+geom_text(aes(y = lab.ypos, label = label), color = "black") +
+scale_fill_brewer(palette="Greys") +
+scale_color_brewer(palette="Greys") +
+coord_polar("y", start = 0, direction = -1) +
+theme_void() +
+xlim(0.5, 2.5) +
+theme(legend.position = "FALSE") +
+labs(title = "Compétences en manipulation de données")
+```
+
+Deux répondants sur dix jugent leurs compétences en manipulation de données "minimes"  
+
+Ces usagers savent rarement utiliser un langage de programmation, mais ils ont fréquemment des connaissances au minimum basiques en manipulation de données textuelles (50%) ou géographiques (40%), ou savent créer des visualisations de données avec un logiciel (60%)
+
+
+\newpage
+## Slide 4 : La moitié des répondants pas ou peu formés à la manipulation des données
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+plotdata <- u %>%
+count(V11_rec) %>%
+arrange(desc(V11_rec)) %>%
+mutate(prop = round(n * 100 / sum(n), 1), lab.ypos = cumsum(prop) - 0.5  *prop)
+  
+plotdata$label <- paste0(plotdata$V11_rec, "\n",
+                         round(plotdata$prop), "%")
+plotdata %>%
+ggplot(aes(x = 2, y = prop, fill = V11_rec)) +
+geom_bar(width = 1, stat = "identity", color = "white") +
+geom_text(aes(y = lab.ypos, label = label), color = "black") +
+scale_fill_brewer(palette="Greys") +
+scale_color_brewer(palette="Greys") +
+coord_polar("y", start = 0, direction = -1) +
+theme_void() +
+xlim(0.5, 2.5) +
+theme(legend.position = "FALSE") +
+labs(title = "Formation à la manipulation de données")
+```
+
+La moitié des répondants n'a pas ou peu été formée à la manipulation de données
+
+A noter : les utilisateurs aux compétences "minimes", ou ceux qui se déclarent "pas ou peu formés" constituent une part non négligeable des usagers fréquents (= ayant visité data.gouv.fr ou un site apparenté plus de 30 fois au cours des 12 derniers mois)  
+Parmi les utilisateurs fréquents, un tiers est peu ou pas formé à la manipulation de données, et un sur dix estime que ses compétences en la matière sont minimes
+
+\newpage
+## Slide 5 : La manipulation des données fait partie de l'activité professionnelle de la moitié des répondants
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+plotdata <- u %>%
+count(V12_rec) %>%
+arrange(desc(V12_rec)) %>%
+mutate(prop = round(n * 100 / sum(n), 1), lab.ypos = cumsum(prop) - 0.5  *prop)
+  
+plotdata$label <- paste0(plotdata$V12_rec, "\n",
+                         round(plotdata$prop), "%")
+plotdata %>%
+ggplot(aes(x = 2, y = prop, fill = V12_rec)) +
+geom_bar(width = 1, stat = "identity", color = "white") +
+geom_text(aes(y = lab.ypos, label = label), color = "black") +
+scale_fill_brewer(palette="Greys") +
+scale_color_brewer(palette="Greys") +
+coord_polar("y", start = 0, direction = -1) +
+theme_void() +
+xlim(0.5, 2.5) +
+theme(legend.position = "FALSE") +
+labs(title = "Manipulation de données au travail")
+```
+
+La manipulation de données fait partie de l’activité professionnelle d'un peu plus de la moitié des répondants  
+
+Mais parmi eux, 28% n’ont pas ou peu été formés à la manipulation de données
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+u %>% 
+filter(V12_rec == "Oui") %>% 
+ggplot() +
+aes(x = "", fill = V11_rec) + 
+geom_bar(position = "fill", width=0.2) +
+scale_fill_brewer(palette="Greys") +
+scale_color_brewer(palette="Greys") +
+scale_y_continuous(labels = percent) +
+labs(title = "Ils manipulent des données au travail", x="Niveau de formation", y="%") 
+```
+
+ 
+
+\newpage
+## Slide 6 : Les répondants arrivent en majorité à trouver ce qu'ils cherchent
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+plotdata <- u %>%
+count(V19_rec) %>%
+arrange(desc(V19_rec)) %>%
+mutate(prop = round(n * 100 / sum(n), 1), lab.ypos = cumsum(prop) - 0.5  *prop)
+  
+plotdata$label <- paste0(plotdata$V19_rec, "\n",
+                         round(plotdata$prop), "%")
+plotdata %>%
+ggplot(aes(x = 2, y = prop, fill = V19_rec)) +
+geom_bar(width = 1, stat = "identity", color = "white") +
+geom_text(aes(y = lab.ypos, label = label), color = "black") +
+scale_fill_brewer(palette="Greys") +
+scale_color_brewer(palette="Greys") +
+coord_polar("y", start = 0, direction = -1) +
+theme_void() +
+xlim(0.5, 2.5) +
+theme(legend.position = "FALSE") +
+labs(title = "Avez-vous trouvé ce que vous cherchiez ?")
+```
+
+La moitié des répondants indiquent avoir trouvé ce qu'ils cherchaient sur data.gouv.fr  
+19 % ne cherchaient rien  
+27 % des répondants indiquent que leur recherche s'est soldée par un échec 
+
+NB : interprétation délicate des réponses à cette question, qui aurait demandé à être précisée. Par exemple : "avez-vous trouvé ce que vous cherchiez *lors de votre dernière visite* ?"
+
+\newpage     
+## Slide 7 : Quand les recherches se soldent par un échec
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+ulong_raison %>%
+  filter(!is.na(V20_rec)) %>% 
+  group_by(raison) %>% 
+  summarise(mean_cases = mean(cases)) %>% 
+  ggplot() +
+  geom_col(aes(y = reorder(raison, mean_cases), x = mean_cases), na.rm=TRUE) +
+  labs(title = "Les raisons de l'échec", x="%", y="raison") + 
+  scale_x_continuous(labels = percent) +
+  ggsave(filename = "raison.png", width = 7, height = 4, dpi = "retina")
+```
+
+\  
+
+La raison la plus souvent avancée pour expliquer l'échec est : "le jeu de données n’existait pas ou je n’ai pas réussi à le retrouver via le moteur de recherche, les catégories"  
+
+Vient ensuite la catégorie "autre"  
+Ceux qui ont répondu "autre" précisent le plus souvent que c'est parce que les données étaient datées, n'étaient pas actualisées : "données cherchées trop anciennes", "données non actualisées", données obsolètes", "jeu de données pas à jour", "trop ancien"    
+
+NB : la question "Pourquoi ?" n'était pas filtrée, alors qu'on suppose qu'elle était implicitement dédiée aux individus qui avaient répondu "non" à la question précédente. Du fait de l'absence de filtre, certains des individus ayant répondu "oui" ou "je ne cherchais rien de particulier" ont également répondu à cette question. Au total, 371 individus ont répondu à la question (alors que seulement 243 avaient répondu "non" à la question précédente). On a décidé de garder toutes les réponses, considérant qu'elles doivent probablement être vues comme une liste de tous les problèmes déjà rencontrés par les utilisateurs de data.gouv.fr.  
+
+
+   
+ 
+\newpage 
+## Slide 8 : Un accès principal aux données via un moteur de recherche externe
+
+
+```{r echo = FALSE, warning = FALSE, message = FALSE}
+ulong_acces %>% 
+  group_by(acces) %>% 
+  summarise(mean_cases = mean(cases)) %>% 
+  ggplot() +
+  geom_col(aes(y = reorder(acces, mean_cases), x = mean_cases), na.rm=TRUE) +
+  labs(title = "Voies d'accès données", x="%", y="chemin") + 
+  scale_x_continuous(labels = percent) +
+  ggsave(filename = "acces.png", width = 7, height = 4, dpi = "retina")
+```
+
+
+39% des répondants disent avoir trouvé le jeu de données via le moteur interne de data.gouv.fr  
+59% via un moteur de recherche externe  
+Ceux qui ont répondu “autre” précisent le plus souvent qu’ils sont arrivés au jeu de données via un autre site  
+
+NB : ici également la question aurait demandé à être précisée. On ne sait pas bien à quoi “ce jeu de données” fait référence, et à qui s’adressait cette question. Probablement à ceux ayant répondu “oui” à la question “Vous avez parcouru le portail data.gouv.fr. Avez-vous trouvé ce que vous cherchiez ?”.
+Du fait de l’absence de filtre, une part importante des individus ayant répondu “non” ou “je ne cherchais rien de particulier” a également répondu. Au total, 840 individus ont répondu à la question. On a décidé de garder toutes les réponses, considérant qu’elles doivent probablement être vues comme les différentes voies d’accès aux données auxquelles ont recours les utilisateurs de data.gouv.fr.
+ 
+
+
+
+\newpage
+## Slide 9 : Qui trouve, qui ne trouve pas son jeu de données ?
+
+![](graphe_slide_9.png)
+\  
+
+Les répondants qui estiment avoir des compétences minimes en manipulation de données trouvent un peu moins ce qu'ils cherchent   
+
+Ils déclarent aussi plus souvent qu'ils ne recherchaient rien de particulier  
+
+Ils utilisent un peu moins le moteur de recherche interne de data.gouv.fr que les autres  
+
+En ce qui concerne les problèmes rencontrés, on ne note pas beaucoup de différences en fonction du niveau de compétences. Ceux qui ont des compétences minimes déclarent un peu plus fréquemment ne pas avoir confiance dans les données, et ceux qui ont des compétences fortes citent des problèmes liés à la granularité. 
+
+\newpage
+## Slide 10 et suivantes : Retours d'utilisateurs sur la découvrabilité des données
+
+Sélection des verbatims par Samuel
+
+
+
+
