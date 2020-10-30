@@ -96,7 +96,14 @@ rankvisits %>%
   geom_col() + 
   coord_flip()
   
-
+rankvisits %>% 
+  drop_na() %>% 
+  group_by(nbdatasets) %>% 
+  summarise(nbvisits = sum(nbvisites)) %>% 
+  ggplot() +
+  geom_point(aes(nbdatasets, nbvisits, size=nbvisits)) +
+  scale_y_log10() 
+ 
 ```
 
 ## Discussions
