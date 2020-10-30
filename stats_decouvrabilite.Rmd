@@ -370,6 +370,7 @@ catalogueorga_date <- catalogue_orga_clean %>%
 
   
 ```
+
 ```{r}
 # Facettes de l'histogramme selon type d'orga 
 # Attention : free scale y 
@@ -551,9 +552,25 @@ treemap_sumvisitsorga <- parjourparul2020_orga %>%
   summarise(somme = sum(nb_visits)) %>% 
   ggplot(aes(area=somme, label=organization, fill=somme)) + 
   geom_treemap() + 
-  geom_treemap_text(colour = "white", reflow = T)
+  geom_treemap_text(colour = "white", reflow = T) + 
+  labs(title = "Répartition de la fréquentation des jeux de données sur DGF ", subtitle = "Répartition par organisation, période : du 1 janvier au 24 septembre 2020", caption = "Source : stats.data.gouv.fr, 24/09/20") + 
+  theme_few() +
+  guides( fill = FALSE) +
+  ggsave(filename = "treemap_frequentation.png", width = 7, height = 4, dpi = "retina")
 
-treemap_sumvisitsorga
+
+sommeproducteurs <- parjourparul2020_orga %>% 
+  group_by(orga)
+
+sumvisitsorga <- parjourparul2020_orga %>% 
+  drop_na(organization) %>% 
+  group_by(organization) %>%
+  summarise(somme = sum(nb_visits))
+
+top20orga <- sumvisitsorga %>% 
+  head(20) %>%
+  as.numeric(somme) %>% 
+  sum(somme)
 
 head(parjourparul2020_orga)
 ```
@@ -571,11 +588,39 @@ treemap_sumvisitsorga_top50 <-  parjourparul2020_orga %>%
   ggplot(aes(area=somme, label=title, subgroup=organization)) + 
   geom_treemap() + 
   geom_treemap_subgroup_border(colour = "white") +
-  geom_treemap_subgroup_text(place = "centre", grow = T, colour ="white", fontface = "italic", min.size = 0) +
+  geom_treemap_subgroup_text(place = "centre", reflow = T, colour ="white", fontface = "italic", min.size = 0) +
   geom_treemap_text(colour = "grey", alpha = 0.5, place = "bottom", reflow = T, min.size = 0)
 
 treemap_sumvisitsorga_top50
 
 
+
+csumvisitsorga_top100 <-  parjourparul2020_orga %>% 
+  drop_na(organization) %>% 
+  group_by(organization, title) %>%
+  summarise(somme = sum(nb_visits)) %>%
+  arrange(desc(somme)) %>% 
+  head(100) 
+
+csumvisitsorga_top100 %>%
+ggplot(aes(area=somme, label=title, subgroup=organization)) + 
+  geom_treemap() + 
+  geom_treemap_subgroup_border(colour = "white") +
+  geom_treemap_subgroup_text(place = "centre", reflow = T, colour ="white", fontface = "italic", min.size = 0) +
+  geom_treemap_text(colour = "grey", alpha = 0.5, place = "bottom", reflow = T, min.size = 0)
 `````
+
+```{r}
+
+parjourparul2020_orga %>%
+    drop_na(title) %>% 
+  mutate(somme = sum(nb_visits)) %>% 
+  arrange(desc(somme)) %>% 
+  head(20) %>% 
+  ggplot() + 
+  geom_col(aes(title, somme)) + 
+  coord_flip()
+  
+
+```
 
