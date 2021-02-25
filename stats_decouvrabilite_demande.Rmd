@@ -14,17 +14,57 @@ library(treemapify)
 library(questionr)
 library(lubridate)
 library(ggthemes)
+library(gghighlight)
 
 ```
 
 # Nombre de vues par jeux de données
-```{r}
 
+
+
+```{r}
+# source des visites
+
+sources <- read_csv(file = "Exporter _2020.csv")
+
+sources$fraction <- sources$Visites / sum(sources$Visites)
+sources$fraction <- sources$fraction * 100
+
+sources %>% 
+  ggplot(aes(fct_reorder(Nom, fraction), round(fraction), fill = Nom, label= round(fraction))) + 
+  geom_col() +
+  geom_text(hjust = -0.5) +
+  coord_flip() +
+  theme(legend.position = "None") + 
+  labs(title = "Canaux d'acquisition des visiteurs", caption = "Source : stats.data.gouv.fr, octobre 2020", x="Canal d'acquisition", y="Pourcentage du total des visites") + 
+  theme_few() +
+  theme(legend.position = "none") +
+  ggsave(filename = "sources.png", width = 8, height = 4, dpi = "retina")
+
+```
+
+# Transformation des données
+
+```{r}
 get_df_id <- function(url) {stringr::str_extract(url, "(?<=/fr/datasets/)[a-zA-Z0-9\\-]+(?=/)")}
 # fonction pour extraire l'identifiant du jeu de données
 
 parjourparul2020 <- read.csv("https://static.data.gouv.fr/resources/nombre-de-visiteurs-par-jour-depuis-2014-des-url-de-data-gouv-fr-1/20201002-023308/20200101-20200916-parjour-parurl.csv")
-# import des données du nombre de visite par jour par URL en 2020 
+# import des données du nombre de visites par jour par URL en 2020 
+
+date_parjourparul2020 <- parjourparul2020 %>% 
+  group_by(date) %>% 
+  summarise(compte = n()) 
+
+#nombre d'URL minimum par jour
+date_parjourparul2020 %>% 
+  select(compte) %>% 
+  min()
+
+#nombre d'URL maxi par jour
+date_parjourparul2020 %>% 
+  select(compte) %>% 
+  max()
 
 parjourparul2020 <-parjourparul2020 %>% 
   mutate(df_id = get_df_id(label))
@@ -35,34 +75,116 @@ catalogue_orga_clean <- catalogue_orga_clean %>%
 # extraire l'identifiant du catalogue (dans stats_decouvrabilite.Rmd)  
 
 parjourparul2020_orga <- left_join(parjourparul2020, catalogue_orga_clean)
+```
 
-treemap_sumvisitsorga <- parjourparul2020_orga %>% 
-  drop_na(organization) %>% 
-  group_by(organization) %>%
-  summarise(somme = sum(nb_visits)) %>% 
-  ggplot(aes(area=somme, label=organization, fill=somme)) + 
-  geom_treemap() + 
-  geom_treemap_text(colour = "white", reflow = T)
 
-treemap_sumvisitsorga
+# Fréquentation par type d'orga
+
+```{r}
+# diagramme en colonnes
+
+natureLabel_rec <- parjourparul2020_orga %>% 
+  group_by(natureLabel_rec) %>% 
+  drop_na() %>% 
+  summarise(total = sum(nb_visits)) 
+
+
+natureLabel_rec$fraction <- (natureLabel_rec$total / sum(natureLabel_rec$total)) * 100
+natureLabel_rec$fraction <- natureLabel_rec$fraction * 100
+
+natureLabel_rec %>% 
+  ggplot(aes(x = fct_reorder(natureLabel_rec, total), y = fraction, fill = natureLabel_rec, label = round(fraction))) + 
+  geom_col() + 
+  geom_text(hjust = - 0.5) + 
+  coord_flip() + 
+  theme(legend.position = "bottom") + 
+  labs(title = "Répartition de la fréquentation par type d'organisations", caption = "Source : stats.data.gouv.fr (octobre 2020), catalogue data.gouv.fr, Wikidata, recodage manuel", x="Type d'organisation", y="Pourcentage des visites") + 
+  theme_few() +
+  theme(legend.position = "none") +
+  ggsave(filename = "diag_visites_orga.png", width = 8, height = 4, dpi = "retina")
+
 
 ```
+
+```{r}
+# treemap par type d'orga
+parjourparul2020_orga %>% 
+  group_by(natureLabel_rec) %>% 
+  summarise(somme = sum(nb_visits)) %>% 
+  ggplot(aes(area=somme, label=natureLabel_rec, fill=somme)) + 
+  geom_treemap() + 
+  geom_treemap_text(colour = "white", reflow = T) + 
+  theme(legend.position = )
+```
+
+```{r}
+#treemap des visites
+
+parjourparul2020_orga %>% 
+  drop_na(organization) %>% 
+  group_by(organization, natureLabel_rec) %>%
+  summarise(somme = sum(nb_visits)) %>% 
+  ggplot(aes(area=somme, label=organization, subgroup=natureLabel_rec, color= "blue")) + 
+  geom_treemap() + 
+  geom_treemap_subgroup_border(colour = "white") +
+  geom_treemap_subgroup_text(place = "centre", grow = T, colour ="white", fontface = "italic", min.size = 0) +
+  geom_treemap_text(colour = "grey", alpha = 0.5, place = "bottom", reflow = T, min.size = 0) +
+  theme(legend.position = "bottom") + 
+  labs(title = "Répartition de la fréquentation par type d'organisations", caption = "Source : stats.data.gouv.fr (octobre 2020), catalogue data.gouv.fr, Wikidata, recodage manuel") + 
+  theme_few() +
+  theme(legend.position = "none") +
+  ggsave(filename = "treemap_orga.png", width = 8, height = 4, dpi = "retina")
+
+
+```
+
+
+```{r}
+# évaluation du pourcentage du top 100
+
+#je ne garde que les url pour les datasets
+
+parjourparul2020_datasets <- parjourparul2020 %>% 
+  filter(str_detect(label, "datasets") == TRUE)
+
+sumvisitsorga <- sum(parjourparul2020_datasets$nb_visits)
+
+top100 <- parjourparul2020_datasets %>% 
+  filter(str_detect(label, "/fr/datasets/ - Autres") == FALSE) %>% 
+  group_by(label) %>%
+  summarise(somme = sum(nb_visits)) %>%
+  arrange(desc(somme)) %>% 
+  head(100)
+
+sumtop100 <- sum(top100$somme)
+
+stat_percenttop100 <- (sumtop100 * 100) / sumvisitsorga
+stat_percenttop100
+
+```
+
+
+
 
 ```{r}
 
 # focus sur les 200 jeux de données regroupées par orga 
 
-treemap_sumvisitsorga_top50 <-  parjourparul2020_orga %>% 
+parjourparul2020_orga %>% 
   drop_na(organization) %>% 
   group_by(title, organization) %>%
   summarise(somme = sum(nb_visits)) %>%
   arrange(desc(somme)) %>% 
-  head(50) %>%
+  head(100) %>%
   ggplot(aes(area=somme, label=title, subgroup=organization)) + 
   geom_treemap() + 
   geom_treemap_subgroup_border(colour = "white") +
   geom_treemap_subgroup_text(place = "centre", grow = T, colour ="white", fontface = "italic", min.size = 0) +
-  geom_treemap_text(colour = "grey", alpha = 0.5, place = "bottom", reflow = T, min.size = 0)
+  geom_treemap_text(colour = "grey", alpha = 0.5, place = "bottom", reflow = T, min.size = 0) + 
+  labs(title = "Répartition de la fréquentation par organisation et par jeu de données", subtitle = "Seuls les 100 jeux de données les plus fréquentés sont représentés", caption = "Source : stats.data.gouv.fr (octobre 2020), catalogue data.gouv.fr, Wikidata, recodage manuel") + 
+  theme_few() +
+  theme(legend.position = "none") +
+  ggsave(filename = "treemap_dataset_orga.png", width = 8, height = 4, dpi = "retina")
 
 treemap_sumvisitsorga_top50
 
@@ -71,38 +193,41 @@ treemap_sumvisitsorga_top50
 
 
 
-
 ```{r}
 rankvisits <- parjourparul2020_orga %>% 
   group_by(organization) %>% 
-  summarise(nbdatasets = length(unique(id)), nbvisites = sum(nb_visits)) %>% 
-  mutate(rankvisit = dense_rank(desc(nbvisites)), rankdataset = dense_rank(desc(nbdatasets)))
+  summarise(nbvisites = sum(nb_visits)) %>% 
+  mutate(rankvisit = dense_rank(desc(nbvisites)))
 
-rankvisits_tidy <- rankvisits %>% 
-  mutate(scorevisit = rankvisit) %>% 
-  pivot_longer(cols = c(rankvisit,rankdataset), names_to = "nb", values_to = "values")
+cumul_dataset_orga <- catalogue_orga_clean %>% 
+  group_by(organization) %>% 
+  summarise(nbdatasets = n())
 
-rankvisits_tidy %>% 
-  drop_na() %>% 
-  filter(scorevisit < 20) %>% 
-  ggplot(aes(x = fct_reorder(organization, desc(scorevisit)), y = values, group = nb, fill=nb)) +
-  geom_col(position = "dodge") + 
-  coord_flip()
+rankvisits <- rankvisits %>% 
+  left_join(cumul_dataset_orga, by = "organization") 
+
+# rankvisits_tidy <- rankvisits %>% 
+#   mutate(scorevisit = rankvisit) %>% 
+#   pivot_longer(cols = c(rankvisit,rankdataset), names_to = "nb", values_to = "values")
+# 
+# rankvisits_tidy %>% 
+#   drop_na() %>% 
+#   filter(scorevisit < 20) %>% 
+#   ggplot(aes(x = fct_reorder(organization, desc(scorevisit)), y = values, group = nb, fill=nb)) +
+#   geom_col(position = "dodge") + 
+#   coord_flip()
 
 rankvisits %>% 
   drop_na() %>% 
   filter(rankvisit < 20) %>% 
   ggplot(aes(x = fct_reorder(organization, desc(rankvisit)), y = nbdatasets)) +
   geom_col() + 
-  coord_flip()
+  coord_flip() +
+  labs(title = "Nombre de jeux de données publiés par les 20 organisations les plus visitées", subtitle = "Seules les 20 organisations les plus fréquentées sont représentées", caption = "Source : stats.data.gouv.fr (octobre 2020), catalogue data.gouv.fr, Wikidata, recodage manuel", x = "Organisations triées par nb de visites", y = "Nombre de jeux de données publiés") + 
+  theme_few() +
+  theme(legend.position = "none", plot.title.position = "plot") +
+  ggsave(filename = "col_datasets.png", width = 8, height = 4, dpi = "retina")
   
-rankvisits %>% 
-  drop_na() %>% 
-  group_by(nbdatasets) %>% 
-  summarise(nbvisits = sum(nbvisites)) %>% 
-  ggplot() +
-  geom_point(aes(nbdatasets, nbvisits, size=nbvisits)) +
-  scale_y_log10() 
  
 ```
 
@@ -129,6 +254,23 @@ closed <- discussions %>%
   nrow()
 
 closed *100 / nbdisc
+
+```
+
+
+```{r}
+
+profils <- read_csv(file = "PROFILS.csv")
+
+profils %>%
+ggplot() +
+geom_col(aes(x = fct_reorder(`Compétences en manipulation de données`, Fraction), y = Fraction, label = `Compétences en manipulation de données`)) +
+scale_fill_brewer(palette="Greys") +
+scale_color_brewer(palette="Greys") +
+coord_flip() +
+theme(legend.position = "FALSE") +
+labs(title = "Compétences en manipulation de données des répondants", x = "Compétence déclarée", y ="Pourcentage des répondants") + 
+ggsave(filename = "profils_rep.png", width = 6, height = 4, dpi = "retina")  
 
 ```
 

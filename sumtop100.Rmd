@@ -1,0 +1,72 @@
+---
+title: "stattop100"
+author: "Samuel Goëta"
+date: "2/24/2021"
+output: html_document
+---
+
+
+```{r}
+library(tidyverse)
+```
+
+
+Je charge les données ressources du catalogue de data gouv 
+```{r}
+ressources240221 <- read_csv2("https://www.data.gouv.fr/fr/datasets/r/4babf5f2-6a9c-45b5-9144-ca5eae6a7a6d")
+names(ressources240221)
+```
+
+Je regroupe la somme par dataset id
+
+```{r}
+
+sumdl_ressources240221 <- ressources240221 %>% 
+  group_by(dataset.id) %>% 
+  summarize(sommedl = sum(downloads)) %>% 
+  arrange(desc(sommedl)) %>% 
+  mutate(id = dataset.id)
+
+
+
+```
+
+
+J'importe le catalogue de dgf
+```{r}
+
+catalogue240221 <- read_csv2("https://www.data.gouv.fr/fr/datasets/r/f868cca6-8da1-4369-a78d-47463f19a9a3")
+
+names(catalogue240221)
+```
+
+Je fais une jointure sur l'id 
+```{r}
+
+catalogue240221_dls <- catalogue240221 %>% 
+  left_join(sumdl_ressources240221) %>% 
+  arrange(desc(sommedl))
+
+names(catalogue240221_dls)
+```
+
+Je calcule le top 100
+```{r}
+catalogue240221_dls2 <- catalogue240221_dls %>% 
+  drop_na(sommedl)
+sumvisitsorgadl <- sum(catalogue240221_dls2$sommedl)
+
+top100 <- catalogue240221_dls %>% 
+  group_by(title) %>%
+  summarise(somme = sum(sommedl)) %>%
+  arrange(desc(somme)) %>% 
+  head(100)
+
+sumtop100 <- sum(top100$somme)
+
+percenttop100 <- (sumtop100 * 100) / sumvisitsorgadl
+percenttop100
+```
+
+
+```{r}

@@ -87,15 +87,20 @@ ggplot(nbdatasetparorga, aes(area=count, label=organization, fill=count)) +
 # stats sur la part du top 10 et du top 50 des orgas (désolé, c'est cracra)
 top10dataset <- nbdatasetparorga %>% 
   head(10) %>% 
- summarise(sum(count))
+ summarise(som = sum(count))
 
 top50dataset <- nbdatasetparorga %>% 
   head(50) %>% 
- summarise(sum(count))
+ summarise(som = sum(count))
+
+top100dataset <- nbdatasetparorga %>% 
+  head(100) %>% 
+ summarise(som = sum(count))
 
 # en %
-percent_top10 <-(10801*100) / nrow(catalogue)
-percent_top50 <-(24231*100) / nrow(catalogue)
+percent_top10 <-(top10dataset$som*100) / nrow(catalogue)
+percent_top50 <-(top50dataset$som*100) / nrow(catalogue)
+percent_top100 <-(top100dataset$som*100) / nrow(catalogue)
 ```
 
 ### Top 50 des producteurs
@@ -315,6 +320,9 @@ nbdatasetpartypeorga_clean_recode <- catalogue_orga_clean %>%
   filter(!is.na(natureLabel_rec)) %>% 
   summarise(count = n()) %>% 
   arrange(desc(count))
+
+#calcul des fractions par type orga
+nbdatasetpartypeorga_clean_recode$fraction <- (nbdatasetpartypeorga_clean_recode$count  * 100) / sum(nbdatasetpartypeorga_clean_recode$count)
 
 nbdatasetpartypeorga_recode <- nbdatasetpartypeorga_clean_recode %>%
   group_by(natureLabel_rec) %>%
@@ -577,7 +585,7 @@ head(parjourparul2020_orga)
 
 ```{r}
 
-# focus sur les 200 jeux de données regroupées par orga 
+  # focus sur les 50 jeux de données regroupées par orga 
 
 treemap_sumvisitsorga_top50 <-  parjourparul2020_orga %>% 
   drop_na(organization) %>% 
@@ -593,24 +601,6 @@ treemap_sumvisitsorga_top50 <-  parjourparul2020_orga %>%
 
 treemap_sumvisitsorga_top50
 
-
-<<<<<<< HEAD
-
-csumvisitsorga_top100 <-  parjourparul2020_orga %>% 
-  drop_na(organization) %>% 
-  group_by(organization, title) %>%
-  summarise(somme = sum(nb_visits)) %>%
-  arrange(desc(somme)) %>% 
-  head(100) 
-
-csumvisitsorga_top100 %>%
-ggplot(aes(area=somme, label=title, subgroup=organization)) + 
-  geom_treemap() + 
-  geom_treemap_subgroup_border(colour = "white") +
-  geom_treemap_subgroup_text(place = "centre", reflow = T, colour ="white", fontface = "italic", min.size = 0) +
-  geom_treemap_text(colour = "grey", alpha = 0.5, place = "bottom", reflow = T, min.size = 0)
-`````
-=======
 ```
 
 
@@ -639,7 +629,7 @@ closed <- discussions %>%
 closed *100 / nbdisc
 
 ```
->>>>>>> 16cde134d4e6ce89914b8646824a664ba2303ccf
+
 
 ```{r}
 

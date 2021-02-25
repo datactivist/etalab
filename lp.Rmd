@@ -1,0 +1,127 @@
+---
+title: "lpmind_jointure"
+author: "Samuel Goëta"
+date: "2/25/2021"
+output: html_document
+---
+
+Objectif : joindre les données de discussion avec celles du catalogue de data gouv
+
+Je charge les librairies 
+```{r}
+library(tidyverse)
+library(airtabler)
+```
+
+
+Je charge les données
+
+```{r}
+
+discussions <- read_csv(file = "discussions-Grid view.csv")
+
+# discussions_air <- 
+#   airtable(
+#     base = "appeyi0431fV4OJn4", 
+#     tables = "discussions")
+# 
+# discussions <-discussions_air$discussions$select()
+names(discussions)
+head(discussions)
+```
+
+
+Airtable a changé le nom des jeux de données, je remets ceux qui sont exactement sur dgf comme c'est notre seule clé de correspondance. on aurait préféré un id hein !
+```{r}
+discussions_dgf_id <- read_csv2("https://www.data.gouv.fr/fr/datasets/r/d77705e1-4ecd-461c-8c24-662d47c4c2f9") %>% 
+    select(id, subject) 
+
+discussions_dgf_id <- discussions_dgf_id %>% 
+  rename(iddgf= id)
+
+discussions <- discussions %>% 
+  rename(iddgf= `id dgf`)
+
+discussions <- discussions %>% 
+  inner_join(discussions_dgf_id, by="iddgf") %>% 
+  rename(subjectok = subject.y)
+
+names(discussions)
+```
+
+je vais afficher les champs du catalogue
+```{r}
+names(catalogue240221)
+```
+
+```{r}
+
+catalogue240221 <- catalogue240221 %>% 
+  mutate(subjectok = title)
+
+discussions_enrichies <- discussions %>% 
+  left_join(catalogue240221, by = "subjectok") %>% 
+  write_csv("discussions-enrichies-250221.csv")
+
+
+names(discussions_enrichies)
+unique(discussions_enrichies$organization)
+
+```
+
+Je crée un data frame allégé avec le nombre de types de problèmes par organisation, je complète avec un classement 
+
+```{r}
+cat_discussions_enrichies <- discussions_enrichies %>%
+  filter(categorie != "Autre") %>% 
+  group_by(organization, categorie, Annotation) %>% 
+  summarise(compte = n()) %>% 
+  arrange(desc(compte)) %>%
+  drop_na(organization)
+  
+  sum_cat_discussions_enrichies <- cat_discussions_enrichies %>% 
+  group_by(organization) %>% 
+  summarise(somme = sum(compte)) %>% 
+  mutate(rankdiscuss = dense_rank(desc(somme))) %>% 
+  arrange(desc(rankdiscuss))
+
+cat_discussions_enrichies <- cat_discussions_enrichies %>% 
+  left_join(sum_cat_discussions_enrichies) %>%
+  arrange(desc(somme))
+  
+
+head(cat_discussions_enrichies)
+```
+
+Je visualise les problèmes des 10 jeux de données les plus commentés
+
+```{r}
+facet_cat <- cat_discussions_enrichies %>% 
+  filter(rankdiscuss < 10) %>% 
+  filter(categorie != "Autre, Actualisation") %>% 
+  ggplot(aes(x = categorie, y = compte, fill=categorie)) +
+  geom_col() + 
+  coord_flip() + 
+    facet_wrap(~ organization) +
+  theme(legend.position = "bottom") 
+facet_cat
+
+cat_facet <- cat_discussions_enrichies %>% 
+  filter(rankdiscuss < 10) %>% 
+  filter(categorie != "Autre, Actualisation") %>% 
+  ggplot(aes(x = organization, y = compte, fill=organization)) +
+  geom_col() + 
+  coord_flip() + 
+   scale_x_discrete(
+    labels = function(x) {
+      is_long <- nchar(x) > 15
+      x[is_long] <- paste0(substr(x[is_long], 1, 15), ".")
+      x
+    }) +
+    facet_wrap(~ categorie) +
+  theme(legend.position = "bottom") 
+cat_facet
+
+  
+```
+
